@@ -161,7 +161,7 @@ export function HeroScene({ phase, countBig, countSmall, layout = 'wide' }: { ph
       <g className="xh-sc-lights" mask="url(#xh-lights-mask)">
         <path d={`M${swag.x0} ${swag.y0} Q${swag.cx} ${swag.cy} ${swag.x1} ${swag.y1}`} fill="none" stroke="#2f4a3b" strokeWidth="1.6" />
         {bulbs.map((b, i) => (
-          <g key={i} className={`xh-sc-bulb${b.twinkle ? ' xh-sc-bulb-twinkle' : ''}`} style={{ animationDelay: `${0.25 + i * 0.045}s, ${2.5 + i * 0.55}s` } as React.CSSProperties}>
+          <g key={i} className={`xh-sc-bulb${b.twinkle ? ' xh-sc-bulb-twinkle' : ''}`} style={{ animationDelay: `${0.25 + i * 0.045}s, ${0.9 + i * 0.08}s` } as React.CSSProperties}>
             <circle cx={b.x} cy={b.y + 7} r="13" fill="url(#xh-bulb)" />
             <circle cx={b.x} cy={b.y + 7} r="3.6" fill={b.tone} />
             <rect x={b.x - 1.8} y={b.y + 1} width="3.6" height="3.2" rx=".8" fill="#4b5a4f" />
@@ -272,7 +272,7 @@ export function HeroScene({ phase, countBig, countSmall, layout = 'wide' }: { ph
       <g className="xh-sc-tokens">
         {C.tokens.map((t, i) => (
           <g key={t.id} transform={`translate(${t.x} ${t.y}) rotate(${t.r})`}>
-            <g className={`xh-token xh-token-${t.id}`} style={{ '--fx': `${t.from[0]}px`, '--fy': `${t.from[1]}px`, animationDelay: `${0.75 + i * 0.12}s, ${2 + i * 0.9}s` } as React.CSSProperties}>
+            <g className={`xh-token xh-token-${t.id}`} style={{ '--fx': `${t.from[0]}px`, '--fy': `${t.from[1]}px`, animationDelay: `${0.75 + i * 0.12}s, ${1.4 + i * 0.15}s` } as React.CSSProperties}>
               <rect x={-t.size / 2} y={-t.size / 2} width={t.size} height={t.size} rx="16" fill="#0b2219" fillOpacity=".72" />
               <rect x={-t.size / 2} y={-t.size / 2} width={t.size} height={t.size} rx="16" fill="url(#xh-glass)" stroke="#f3d79a" strokeOpacity=".5" strokeWidth="1.2" />
               <path d={`M${-t.size / 2 + 12} ${-t.size / 2 + 1.5} H${t.size / 2 - 12}`} stroke="#fff" strokeOpacity=".35" strokeWidth="1.2" strokeLinecap="round" />

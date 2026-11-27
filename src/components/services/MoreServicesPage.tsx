@@ -3,6 +3,7 @@ import './services.css';
 import { ArrowRight, Search, X } from 'lucide-react';
 import { getAfaConfig } from '../../services/afaApi';
 import { useApp } from '../../context/AppContext';
+import { ALL_NETWORKS_LABEL, openNetworksLabel, pausedLabel, purchasePaused, useServiceStatus } from '../../hooks/useServiceStatus';
 import { DIGITAL_SERVICES } from '../../data/services';
 import type { DigitalService } from '../../types';
 import {
@@ -28,7 +29,7 @@ import { Seasonal } from '../../seasonal/Seasonal';
 
 /** The everyday purchases and the free website lead "Available now". */
 const FEATURED = new Set(['srv-data', 'srv-airtime', 'srv-website']);
-const NETWORKS = ['MTN', 'Telecel', 'AirtelTigo'];
+const NETWORKS: [string, string][] = [['mtn', 'MTN'], ['telecel', 'Telecel'], ['airteltigo', 'AirtelTigo']];
 const CATEGORIES = serviceCategories(DIGITAL_SERVICES);
 const isPlainClick = (e: React.MouseEvent) => !(e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0);
 
@@ -90,7 +91,14 @@ export const MoreServicesPage: React.FC = () => {
     });
   }, [previewSlug]);
 
-  const availabilityOf = useCallback((service: DigitalService) => serviceAvailability(service, afa), [afa]);
+  // 3.6.4: Data and Airtime cards name only the networks selling now, a paused network's chip says so, and a service
+  // with no network open is listed as unavailable (Service Control Center).
+  const serviceStatus = useServiceStatus();
+  const dataNetworks = openNetworksLabel('data', serviceStatus), airtimeNetworks = openNetworksLabel('airtime', serviceStatus);
+  const availabilityOf = useCallback((service: DigitalService) => service.dataMode && !openNetworksLabel(service.dataMode, serviceStatus) ? 'unavailable' : serviceAvailability(service, afa), [afa, serviceStatus]);
+  const taglineOf = (service: DigitalService) => service.id === 'srv-data' ? (dataNetworks ? `Bundles on ${dataNetworks}` : pausedLabel('data', serviceStatus))
+    : service.dataMode === 'airtime' ? (airtimeNetworks === ALL_NETWORKS_LABEL ? service.tagline : airtimeNetworks ? `${airtimeNetworks} numbers` : pausedLabel('airtime', serviceStatus))
+    : service.tagline;
 
   const openService = useCallback((service: DigitalService, event?: React.MouseEvent) => {
     if (event && !isPlainClick(event)) return; // let the browser open the link in a new tab
@@ -163,8 +171,10 @@ export const MoreServicesPage: React.FC = () => {
         <span className="sd-icon"><ServiceIcon service={service} size={isFeatured ? 24 : 22} /></span>
         <div className="sd-card-top"><h3>{service.title}</h3><StatusBadge service={service} availability={availability} /></div>
         <span className="sd-card-desc">{service.description}</span>
-        {service.tagline && <span className="sd-card-tagline">{service.tagline}</span>}
-        {service.dataMode && <span className="sd-networks" aria-label="Networks">{NETWORKS.map(n => <span key={n}>{n}</span>)}</span>}
+        {service.tagline && <span className="sd-card-tagline">{taglineOf(service)}</span>}
+        {service.dataMode && <span className="sd-networks" aria-label="Networks">{NETWORKS.map(([id, name]) => purchasePaused(service.dataMode, id, serviceStatus)
+          ? <span key={id} className="is-paused">{name} · paused</span>
+          : <span key={id}>{name}</span>)}</span>}
         <span className="sd-card-foot" style={{ gridColumn: '1 / -1' }}>
           <span className="sd-card-action">{serviceActionLabel(service, availability)}<ArrowRight size={16} aria-hidden /></span>
           {service.id === 'srv-wallet' && !user && <span className="sd-card-meta">Sign in to use</span>}

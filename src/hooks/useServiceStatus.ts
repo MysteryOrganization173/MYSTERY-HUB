@@ -101,3 +101,30 @@ export function useOpenNetworkChoice<N extends string>(service: string, networks
   const network = !chosen.byCustomer && purchasePaused(service, chosen.network, status) ? firstOpen() : chosen.network;
   return [network, (next: N) => setChosen({ network: next, byCustomer: true })];
 }
+
+const NETWORK_LABELS: [string, string][] = [['mtn', 'MTN'], ['telecel', 'Telecel'], ['airteltigo', 'AirtelTigo']];
+/**
+ * 3.6.4: the networks currently open for new purchases of a service, for short copy such as "MTN, Telecel & AirtelTigo"
+ * on service cards. A paused network is left out, so no card advertises it; null when every network is paused.
+ */
+export function openNetworksLabel(service: string, status: ServiceStatus = current): string | null {
+  const open = NETWORK_LABELS.filter(([id]) => !purchasePaused(service, id, status)).map(([, name]) => name);
+  if (!open.length) return null;
+  return open.length === 1 ? open[0] : `${open.slice(0, -1).join(', ')} & ${open[open.length - 1]}`;
+}
+
+/** The label openNetworksLabel gives when every network is open. */
+export const ALL_NETWORKS_LABEL = 'MTN, Telecel & AirtelTigo';
+/**
+ * Short words for a service with no network open. "for maintenance" only when every paused control says maintenance
+ * (a suspension, or a record that could not be read, is simply "paused for now"); never a reason that was not given.
+ */
+export function pausedLabel(service: string, status: ServiceStatus = current): string {
+  const paused = status.controls.filter((c) => c.service === service && c.blocksPurchases);
+  return paused.length > 0 && paused.every((c) => c.state === 'maintenance') ? 'Paused for maintenance' : 'Paused for now';
+}
+/** Airtime card copy: "any Ghana number" only while every network is open; otherwise the open ones, or paused. */
+export function airtimeCardLine(status: ServiceStatus = current): string {
+  const open = openNetworksLabel('airtime', status);
+  return open === ALL_NETWORKS_LABEL ? 'Top up any Ghana number' : open ? `Top up ${open} numbers` : pausedLabel('airtime', status);
+}

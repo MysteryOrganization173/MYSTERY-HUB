@@ -283,7 +283,7 @@ export const CheckoutModal: React.FC = () => {
       <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Purchases paused"
         style={{ top: viewport.top, height: viewport.height || undefined }}
         className="mh-sheet-backdrop fixed inset-x-0 top-0 h-dvh z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm">
-        <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
+        <div data-sheet-mood="serious" className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
           <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-2 shrink-0">
             <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />
             <h3 className="pt-1 font-semibold text-base text-white">{pausedIncident.title}</h3>
@@ -570,7 +570,7 @@ export const CheckoutModal: React.FC = () => {
       style={{ top: viewport.top, height: viewport.height || undefined }}
       className="mh-sheet-backdrop fixed inset-x-0 top-0 h-dvh z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/75 backdrop-blur-sm"
     >
-      <div className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
+      <div data-sheet-mood={preflightIssue || serverError || paymentClosed || recoveryOnly || activeMtnConflict || quoteError || flexiError ? 'serious' : undefined} className="mh-sheet relative w-full max-w-[calc(100vw-1rem)] mx-auto sm:max-w-md bg-[#0f151b] border border-slate-700/70 border-b-0 sm:border-b rounded-t-[1.5rem] sm:rounded-[1.5rem] shadow-2xl overflow-hidden text-slate-100 max-h-[calc(100%-0.75rem)] sm:max-h-[92dvh] flex flex-col">
         {/* Header */}
         <div className="relative flex items-center justify-between gap-3 px-4 sm:px-5 pt-3 pb-2 shrink-0">
           <span aria-hidden="true" className="sm:hidden absolute left-1/2 top-1.5 -translate-x-1/2 h-1 w-10 rounded-full bg-slate-700" />

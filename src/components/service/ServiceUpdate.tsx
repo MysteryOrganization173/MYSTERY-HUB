@@ -4,6 +4,7 @@ import { AlertTriangle, ChevronDown, Info, PackageSearch, Wrench, X, Zap } from 
 import { useApp } from '../../context/AppContext';
 import { NetworkBrandBadge } from '../common/NetworkBrandBadge';
 import { useServiceStatus, serviceControl } from '../../hooks/useServiceStatus';
+import { useOverlayLock } from '../../utils/overlayStack';
 import { restorationLine, type PublicServiceControl } from '../../../shared/serviceControls';
 import { ANNOUNCEMENT_CTAS, announcementsFor, type PublicAnnouncement } from '../../../shared/announcements';
 import type { NetworkId } from '../../types';
@@ -118,6 +119,9 @@ export function AnnouncementModal({ page, blocked }: { page: string; blocked: bo
   const closeRef = useRef<HTMLButtonElement>(null);
   const shown = blocked ? undefined : announcementsFor(status.announcements, page, Boolean(user), 'modal').find((a) => !seen.includes(keyOf(a)));
   const shownKey = shown ? keyOf(shown) : null;
+  // 3.6.4: one shared overlay system: while the pop-up is open the page is held still and invitations (install,
+  // notifications, channel) wait, exactly as for every other dialog.
+  useOverlayLock(Boolean(shownKey), dialogRef);
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog || !shownKey) return;
@@ -126,7 +130,8 @@ export function AnnouncementModal({ page, blocked }: { page: string; blocked: bo
     return () => { if (dialog.open) dialog.close(); };
   }, [shownKey]);
   if (!shown) return null;
-  const close = () => setSeen(addKey(MODAL_KEY, keyOf(shown)));
+  // Close the native dialog before it leaves the page, so focus returns to where the customer was (3.6.4).
+  const close = () => { if (dialogRef.current?.open) dialogRef.current.close(); setSeen(addKey(MODAL_KEY, keyOf(shown))); };
   const restoration = restorationFor(shown, status.controls, status.serverDate);
   const cta = shown.cta ? ANNOUNCEMENT_CTAS[shown.cta] : null;
   return (

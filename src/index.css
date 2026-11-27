@@ -122,6 +122,10 @@
 /* Data buying: checkout and receipt open as a bottom sheet on phones and a centred dialog from sm. */
 @keyframes mh-sheet-in { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes mh-fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* A decorative "live" mark that pulses a few times on arrival, then rests (3.6.4: no endless decorative loops). */
+.mh-brief-pulse { animation: mh-brief-pulse 1.6s ease-in-out 3; }
+@keyframes mh-brief-pulse { 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .mh-brief-pulse { animation: none; } }
 .mh-sheet { animation: mh-sheet-in 220ms cubic-bezier(.2,.8,.2,1); }
 .mh-sheet-backdrop { animation: mh-fade-in 160ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .mh-sheet, .mh-sheet-backdrop { animation: none; } }

@@ -1,20 +1,34 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Copy, ExternalLink, Gift } from 'lucide-react';
 import { API_BASE_URL } from '../../../services/apiClient';
-import type { SeasonStatus } from '../../../../shared/seasonal';
+import { CHRISTMAS_2026, type SeasonStatus } from '../../../../shared/seasonal';
 import { AdminButton, AdminNotice, AdminPanel, DefinitionList, RefreshButton, StatusPill } from '../ui/AdminUi';
 
 /** The approved calendar, so the founder can review every phase before it happens. */
 const PREVIEW_DAYS: { date: string; label: string }[] = [
+  { date: '2026-12-01', label: 'First day' },
   { date: '2026-12-10', label: 'Christmas season' },
   { date: '2026-12-24', label: 'Christmas Eve' },
   { date: '2026-12-25', label: 'Christmas Day' },
   { date: '2026-12-26', label: 'Boxing Day' },
-  { date: '2026-12-29', label: 'Toward New Year' },
+  { date: '2026-12-27', label: 'Toward New Year' },
   { date: '2026-12-31', label: 'New Year’s Eve' },
   { date: '2027-01-01', label: 'New Year’s Day' },
-  { date: '2027-01-03', label: 'New Year celebration' },
+  { date: '2027-01-05', label: 'Last day' },
 ];
+
+type PanelStatus = SeasonStatus & { scheduledPack?: string | null };
+const longDate = (date: string) => new Date(date + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+/** What the setting means today: on, set and waiting for its first day, set but finished, or off. */
+export function settingState(status: PanelStatus): { tone: 'success' | 'info' | 'neutral'; label: string } {
+  if (status.active) return { tone: 'success', label: `On for everyone · ${status.pack}` };
+  // An API from before 3.6.4 cannot say whether the setting is present (the site and API deploy separately): never
+  // report "Off" from silence, which could prompt an unneeded production change.
+  if (!('scheduledPack' in status)) return { tone: 'neutral', label: 'Not on for customers today · this API version does not report whether the setting is present' };
+  if (status.scheduledPack && status.date < CHRISTMAS_2026.start) return { tone: 'info', label: `Set · starts on its own on ${longDate(CHRISTMAS_2026.start)}` };
+  if (status.scheduledPack) return { tone: 'neutral', label: 'Set, but the season has ended (ordinary appearance)' };
+  return { tone: 'neutral', label: 'Off (setting not present)' };
+}
 
 const previewUrl = (date: string) => `${window.location.origin}/?season-preview=christmas-2026&season-date=${date}`;
 
@@ -24,7 +38,7 @@ const previewUrl = (date: string) => `${window.location.origin}/?season-preview=
  * opens them: a private window shows the signed-out site, a signed-in tab shows the customer's seasonal homepage.
  */
 export function AdminSeasonalPanel() {
-  const [status, setStatus] = useState<SeasonStatus | null>(null);
+  const [status, setStatus] = useState<PanelStatus | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState(PREVIEW_DAYS[0].date);
@@ -45,7 +59,7 @@ export function AdminSeasonalPanel() {
     try { await navigator.clipboard.writeText(previewUrl(date)); setCopied(true); window.setTimeout(() => setCopied(false), 2500); }
     catch { setError('Copying is blocked in this browser. Use “Open preview” instead.'); }
   };
-  const live = Boolean(status?.active);
+  const state = status ? settingState(status) : null;
 
   return (
     <AdminPanel title={<span className="inline-flex items-center gap-2"><Gift className="h-4 w-4 text-[#e9b949]" />Seasonal experience</span>}
@@ -54,19 +68,25 @@ export function AdminSeasonalPanel() {
       <div className="space-y-4">
         {error && <AdminNotice tone="warning" title="Status not available">{error}</AdminNotice>}
         <DefinitionList items={[
-          ['For customers now', status ? <StatusPill tone={live ? 'success' : 'neutral'}>{live ? `On · ${status.pack}` : 'Off'}</StatusPill> : '…'],
+          ['For customers now', state ? <StatusPill tone={state.tone}>{state.label}</StatusPill> : '…'],
           ['Calendar today (Accra)', status ? `${status.date} · ${status.phase.replace(/-/g, ' ')}` : '…'],
-          ['Who it shows to', 'Everyone gets the seasonal header, phone menu and footer. Signed-out visitors get every guest page; signed-in customers get the seasonal homepage, Data page, Orders and receipts, and their other account pages stay as they are. A receipt that needs attention, a refund or an unconfirmed payment always keeps its ordinary look.'],
+          ['Season dates', `${longDate(CHRISTMAS_2026.start)} to ${longDate(CHRISTMAS_2026.end)} (Accra). Christmas artwork through Boxing Day; New Year from 27 December; the ordinary appearance returns by itself on 6 January 2027, with the setting left in place.`],
+          ['Who it shows to', 'Everyone gets the seasonal header, phone menu, footer, Data page, Orders and receipts. Signed-out visitors get every guest page and the guest homepage; signed-in customers get the seasonal homepage and a quiet seasonal line on their other pages. Problem states (paused services, payments being recovered, receipts that need support) always stay plain.'],
           ['Where it never shows', 'Admin, the website editor, My Business and published customer websites.'],
         ]} />
         <AdminNotice tone="info" title="How it is switched on and off">
-          It is controlled by one setting on the API service: <code className="text-slate-200">SEASONAL_EXPERIENCE=christmas-2026</code> turns it on for
-          everyone from 1 December 2026 to 5 January 2027 (Accra). Removing the setting turns it off within about five minutes. This panel only reads
-          the setting; changing it needs the founder’s approval and a Render environment change.
+          It is controlled by one setting on the API service: <code className="text-slate-200">SEASONAL_EXPERIENCE=christmas-2026</code>. With it set,
+          the season starts by itself at midnight on 1 December 2026 (Accra) and ends by itself on 6 January 2027, including for pages and installed
+          apps left open. Removing the setting turns it off: new visits within about five minutes, open pages within about 35 minutes or when reopened.
+          This panel only reads the setting; changing it needs the founder’s approval and a Render environment change.
+        </AdminNotice>
+        <AdminNotice tone="neutral" title="Separate decisions">
+          The season is presentation only. It does not restore MTN Data, open Mystery Greetings, start the December campaign or turn on storefront
+          payments; each of those is its own decision and its own setting. Paused services and announcements in the Service Control Center keep applying.
         </AdminNotice>
         <div className="rounded-xl border border-slate-800 bg-[#0b1116] p-4 space-y-3">
           <p className="text-sm font-semibold text-white">Preview a day</p>
-          <p className="text-xs text-slate-400">The preview shows only in the browser tab that opens it, with a “Christmas preview” ribbon. Open it in a private window to see the signed-out site, or in a tab where you are signed in to see the customer homepage; nobody else is affected.</p>
+          <p className="text-xs text-slate-400">Leave a preview with “Exit preview” on its ribbon, or close the tab. A preview is a look at the artwork, not a security boundary, and it never changes prices, availability or anything another visitor sees. The preview shows only in the browser tab that opens it, with a “Christmas preview” ribbon. Open it in a private window to see the signed-out site, or in a tab where you are signed in to see the customer homepage; nobody else is affected.</p>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Preview day">
             {PREVIEW_DAYS.map(day => (
               <button key={day.date} type="button" onClick={() => setDate(day.date)} aria-pressed={date === day.date}

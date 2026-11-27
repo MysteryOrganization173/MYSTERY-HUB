@@ -161,12 +161,13 @@
 .xh-scene[data-nudge] .xh-sc-lid-hop { animation: xh-lid-hop .95s var(--xh-ease); }
 .xh-scene[data-nudge] .xh-sc-burst circle { animation: xh-burst .95s ease-out both; }
 .xh-scene[data-nudge] .xh-sc-burst circle:nth-child(odd) { animation-delay: .06s; }
-/* Idle life, only on desktop screens that hover, and only while the hero is on screen. */
+/* Idle life, only on desktop screens that hover, the first time the hero is on screen: one gentle float and two
+   twinkles that settle (3.6.4: finite, under five seconds after the entrance; nothing loops). */
 @media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 6.5s ease-in-out infinite; }
-  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-tokens .xh-token { animation: xh-bob 6.5s ease-in-out infinite; }
-  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 5s 2.5s ease-in-out infinite; }
-  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-bulb-twinkle { animation: xh-twinkle 5s ease-in-out infinite; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-tokens .xh-token { animation: xh-token-in 1s var(--xh-ease) both, xh-bob 3s 1s ease-in-out 1; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-tokens .xh-token { animation: xh-bob 3s ease-in-out 1; }
+  .xh-hero[data-xh-visible]:not([data-xh-settled]) .xh-scene .xh-sc-bulb-twinkle { animation: xh-on .5s ease-out both, xh-twinkle 2.4s .8s ease-in-out 1; }
+  .xh-hero[data-xh-visible][data-xh-settled] .xh-scene .xh-sc-bulb-twinkle { animation: xh-twinkle 2.4s ease-in-out 1; }
 }
 
 /* ───────────────────────── Services, gift-wrapped ───────────────────────── */

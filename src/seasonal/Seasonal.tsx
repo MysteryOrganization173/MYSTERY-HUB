@@ -40,9 +40,18 @@ class SeasonalBoundary extends React.Component<{ fallback: ReactNode; children: 
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
+/**
+ * Slots that dress a shared page for signed-in customers too (3.6.4, Level B: one accent row above the title, and the
+ * Creative Studio stage), so a member's Wallet, Help or Services page carries the same quiet seasonal detail as a
+ * guest's. Never while the account is still being checked (no styles apply to that moment), and the guest-only slots
+ * (header lights, sign-in invitation, footer greeting, checkout celebration) stay guest-only.
+ */
+const SHARED_SLOTS: readonly ChristmasSlot[] = ['page', 'creative-stage'];
+
 export function Seasonal({ slot, page }: { slot: ChristmasSlot; page?: SeasonPage }) {
   const season = useSeason();
-  if (!season.active || season.status.pack !== 'christmas-2026') return null;
+  const on = SHARED_SLOTS.includes(slot) ? season.active || season.memberActive : season.active;
+  if (!on || season.status.pack !== 'christmas-2026') return null;
   return <SeasonalBoundary fallback={null}><Suspense fallback={null}><ChristmasPack slot={slot} page={page} status={season.status} /></Suspense></SeasonalBoundary>;
 }
 
@@ -129,7 +138,7 @@ export function SeasonalShellLayer({ page }: { page?: string }) {
   const season = useSeason();
   const { isAuthModalOpen } = useApp();
   useEffect(() => { if (season.shellActive) void loadShell().catch(() => undefined); }, [season.shellActive]);
-  useEffect(() => { if (season.active) void loadChristmas().catch(() => undefined); }, [season.active]);
+  useEffect(() => { if (season.active || season.memberActive) void loadChristmas().catch(() => undefined); }, [season.active, season.memberActive]);
   useEffect(() => { if (season.active && page === 'home') void loadChristmasHome().catch(() => undefined); }, [season.active, page]);
   // The member homepage starts downloading while a returning customer's session is still being checked, and when a
   // guest opens Sign in / Create account, so signing in moves straight to it instead of waiting on a download.

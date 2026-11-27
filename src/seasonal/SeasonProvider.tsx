@@ -1,10 +1,12 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { API_BASE_URL } from '../services/apiClient';
 import {
   accraDate, greetingsEntry, GREETINGS_COMING_SOON, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, serverSeasonStatus,
   type GreetingsEntry, type SeasonalPackId, type SeasonStatus,
 } from '../../shared/seasonal';
+import { usableStoredSeason } from './seasonClock';
+import { startSeasonSync } from './seasonSync';
 
 /**
  * Seasonal Experience state for the customer site.
@@ -20,6 +22,13 @@ import {
  *   - signed-out visitors get the whole guest journey: every guest page composition and the guest homepage
  *     (`active`, `data-season`);
  *   - signed-in customers get the seasonal member homepage (`memberActive`); their other pages stay normal for now.
+ * - Lifecycle (3.6.4): the server says which pack is switched on (`scheduledPack`, even before its first day); this
+ *   page works out today's Accra day itself, so an open tab or installed app changes phase at midnight (1 December,
+ *   Christmas Day, 27 December, New Year, and back to normal on 6 January) without a reload. It asks the server again
+ *   only when that could change the answer: just after midnight (spread over 30 s), back in the foreground after five
+ *   minutes, when the connection returns, and every 30 minutes while visible. A device clock more than ten minutes
+ *   from the server's is corrected. Offline, the last answer stands for up to seven days, always within the pack's
+ *   dates; after that the page is ordinary until the server answers. See seasonClock.ts.
  */
 
 const PREVIEW_KEY = 'mh-season-preview';
@@ -68,52 +77,67 @@ function takePreviewFromUrl(): StoredPreview | null {
     const stored: StoredPreview | null = pack ? { pack, date: parsePreviewDate(date) } : null;
     writeStorage(() => sessionStorage, PREVIEW_KEY, stored);
     url.searchParams.delete('season-preview'); url.searchParams.delete('season-date'); url.searchParams.delete('amp;season-date');
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    try { window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`); } catch { /* a locked-down browser: the address simply keeps the parameters */ }
     return stored;
   }
   const saved = readStorage<StoredPreview>(() => sessionStorage, PREVIEW_KEY);
   return saved && parseSeasonSetting(saved.pack) ? { pack: saved.pack, date: parsePreviewDate(saved.date) } : null;
 }
 
-/** The last server answer, so a returning visitor sees the season immediately; the server is asked again every load. */
-function cachedServerStatus(): SeasonStatus {
-  const cached = readStorage<{ pack: string | null }>(() => localStorage, CACHE_KEY);
-  return cached?.pack ? serverSeasonStatus(cached.pack) : OFF;
-}
+/** The last server answer (if recent enough), so a returning visitor sees the season immediately. */
+const storedSeason = () => usableStoredSeason(readStorage<unknown>(() => localStorage, CACHE_KEY), Date.now());
+/** The status for one Accra day, from the pack the server switched on (or none). */
+const statusOn = (pack: SeasonalPackId | null, day: string) => serverSeasonStatus(pack, new Date(day + 'T12:00:00Z'));
 
 export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthChecking } = useApp();
   const [preview, setPreview] = useState<StoredPreview | null>(takePreviewFromUrl);
-  const [server, setServer] = useState<SeasonStatus>(cachedServerStatus);
+  const [initial] = useState(storedSeason);
+  const [scheduled, setScheduled] = useState<SeasonalPackId | null>(initial?.pack ?? null);
+  const skew = useRef(initial?.skew ?? 0);
+  const [today, setToday] = useState(() => accraDate(new Date(Date.now() + skew.current)));
   const [greetings, setGreetings] = useState<GreetingsEntry>(GREETINGS_COMING_SOON);
 
-  useEffect(() => {
-    let alive = true;
-    fetch(`${API_BASE_URL}/api/seasonal/status`, { headers: { Accept: 'application/json' } })
-      .then(res => (res.ok ? res.json() : null))
-      .then((data: { active?: boolean; pack?: unknown; greetings?: unknown } | null) => {
-        if (!alive || !data) return;
-        // The server is the only authority; the page recomputes the phase from today's Accra date.
-        const pack = data.active ? parseSeasonSetting(data.pack) : null;
-        writeStorage(() => localStorage, CACHE_KEY, { pack });
-        setServer(serverSeasonStatus(pack));
-        setGreetings(greetingsEntry(data.greetings));
-      })
-      .catch(() => { /* offline or blocked: keep the last known answer, which defaults to off */ });
-    return () => { alive = false; };
-  }, []);
+  // The server connection and the Accra-midnight schedule (seasonSync.ts): one request at a time, refreshed only when
+  // the answer could have changed; the phase itself is worked out on this device from the corrected clock.
+  useEffect(() => startSeasonSync({
+    fetchStatus: (fresh, signal) => fetch(`${API_BASE_URL}/api/seasonal/status`, { headers: { Accept: 'application/json' }, signal, ...(fresh ? { cache: 'no-cache' as RequestCache } : {}) })
+      .then(res => (res.ok ? res.json() : null)),
+    now: () => Date.now(),
+    random: Math.random,
+    isHidden: () => document.visibilityState === 'hidden',
+    listen: ({ onReturn, onOnline }) => {
+      document.addEventListener('visibilitychange', onReturn);
+      window.addEventListener('focus', onReturn); window.addEventListener('pageshow', onReturn); window.addEventListener('online', onOnline);
+      return () => {
+        document.removeEventListener('visibilitychange', onReturn);
+        window.removeEventListener('focus', onReturn); window.removeEventListener('pageshow', onReturn); window.removeEventListener('online', onOnline);
+      };
+    },
+    initial,
+    onAnswer: (data) => {
+      // The server is the only authority on which pack is on; the page recomputes the phase from today's Accra date.
+      skew.current = data.skew;
+      writeStorage(() => localStorage, CACHE_KEY, { pack: data.pack, at: data.at, skew: data.skew });
+      setScheduled(data.pack);
+      setGreetings(greetingsEntry(data.greetings));
+    },
+    onDay: (corrected) => setToday(accraDate(new Date(corrected))),
+    // Offline or blocked for longer than the last answer may stand: the ordinary appearance until the server answers.
+    onStale: () => setScheduled(null),
+  }), [initial]);
 
   const exitPreview = useCallback(() => { writeStorage(() => sessionStorage, PREVIEW_KEY, null); setPreview(null); }, []);
 
   const value = useMemo<SeasonContextValue>(() => {
-    const status = preview ? previewSeasonStatus(preview.pack, preview.date || accraDate()) : server;
+    const status = preview ? previewSeasonStatus(preview.pack, preview.date || today) : statusOn(scheduled, today);
     const signedOut = !user && !isAuthChecking;
     const signedIn = Boolean(user) && !isAuthChecking;
     return {
       status, active: status.active && signedOut, memberActive: status.active && signedIn, shellActive: status.active,
       previewing: Boolean(preview), heldForSignedIn: status.active && !signedOut, greetings, exitPreview,
     };
-  }, [preview, server, greetings, user, isAuthChecking, exitPreview]);
+  }, [preview, scheduled, today, greetings, user, isAuthChecking, exitPreview]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 };

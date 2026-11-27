@@ -224,7 +224,9 @@ test('member styles stay in their own xm- namespace with transform/opacity motio
   const loops = clean.split('\n').filter(line => /infinite/.test(line));
   for (const line of loops) assert.match(line, /^\s*(\.xm-live-dot::after|\.xm-skeleton::after|\.xm-welcome\[data-xh-done\] (\.xm-gift|\.xm-bulb))/, line);
   const idle = clean.slice(clean.indexOf('@media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {'));
-  assert.ok(idle.includes('xm-twinkle 4.5s') && idle.includes('xm-glow 5s'), 'idle light lives only in the capable-desktop block');
+  // 3.6.4: the idle light is finite (two soft glints, then still), still only in the capable-desktop block.
+  assert.ok(idle.includes('xm-twinkle 2s') && idle.includes('xm-glow 2.2s'), 'idle light lives only in the capable-desktop block');
+  assert.equal(loops.filter(line => /xm-welcome/.test(line)).length, 0, 'no endless idle loop');
   assert.match(clean, /@media \(prefers-reduced-motion: reduce\) \{\s*\.xm-home \*, \.xm-home \*::before, \.xm-home \*::after \{ animation: none !important; transition: none !important; \}/);
   assert.match(read('src/seasonal/christmas/member/ChristmasMemberHome.tsx'), /useReveal\(root, 'member'\);/);
   assert.match(read('src/seasonal/christmas/shell/shell.css'), /\.mh-app\[data-season-shell="christmas"\]:has\(\.xm-home\) > main \{ padding-bottom: 0; background: #050d0a; \}/);
