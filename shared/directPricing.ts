@@ -4,6 +4,12 @@ export const DIRECT_RETAIL_MINOR: Record<string, number> = {
   'at-1gb':499,'at-2gb':949,'at-3gb':1399,'at-4gb':1849,'at-5gb':2299,
   'telecel-10gb':4499,'telecel-15gb':6699,'telecel-20gb':8899,'telecel-25gb':11099,'telecel-30gb':12299,'telecel-40gb':16399,'telecel-50gb':20399,'telecel-100gb':39999,
 };
+/** Founder review proposal. These are separate from approved retail seeds. */
+export const AIRTELTIGO_ISHARE_CANDIDATES = [6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 100].map(gb => ({
+  id: `at-${gb}gb`,
+  dataAmount: `${gb}GB`,
+  proposedRetailMinor: 450 * gb + 49,
+}));
 export interface CommercialSnapshot {
   regularMinor:number; discountMinor:number; paidMinor:number; pricingRevision:string;
   promotionId:'welcome-v1'|null; promotionRevision:string|null; buyerPhone:string|null;

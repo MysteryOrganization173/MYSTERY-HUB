@@ -31,11 +31,28 @@ function campaignFields(p:any):Pick<DataBundle,'standardPriceGhc'|'priceCampaign
  const ok=p?.campaign&&typeof p.campaign.label==='string'&&Number.isSafeInteger(p.standardPesewas)&&Number.isSafeInteger(p.amountPesewas)&&p.standardPesewas>p.amountPesewas;
  return ok?{standardPriceGhc:p.standardPesewas/100,priceCampaign:{label:p.campaign.label,stacksWithWelcome:p.campaign.stacksWithWelcome===true}}:{};
 }
+/** New server-only plans need size/filter metadata even without a bundled fallback card. */
+export function projectDirectCatalogBundle(p:any):DataBundle|null {
+ const existing=DATA_BUNDLES.find(b=>b.id===p.id);
+ if(existing){
+  const {standardPriceGhc:_s,priceCampaign:_c,...base}=existing;
+  return {...base,id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)};
+ }
+ const size=typeof p.dataAmount==='string'?/^(\d+(?:\.\d+)?)(GB|MB)$/.exec(p.dataAmount):null;
+ if(!size||!['mtn','telecel','airteltigo'].includes(p.network))return null;
+ const mb=Number(size[1])*(size[2]==='GB'?1024:1);
+ if(!Number.isFinite(mb)||mb<=0)return null;
+ return {
+  id:p.id,network:p.network,dataAmount:p.dataAmount,dataBytesValue:mb,
+  validity:p.validity??'',validityCategory:'Monthly',priceGhc:p.priceGhc,
+  description:p.description,serviceType:'data',...campaignFields(p),
+ };
+}
 export async function refreshDirectCatalog(){
  if(request)return request;
  request=commercialRequest('commercial/products').then(result=>{
   // Rebuilt from the static fields only: campaign fields come from this response alone, so none outlives the campaign.
-  unfiltered=result.products.map((p:any)=>{const {standardPriceGhc:_s,priceCampaign:_c,...base}=(DATA_BUNDLES.find(b=>b.id===p.id)||{}) as DataBundle;return {...base,id:p.id,network:p.network,dataAmount:p.dataAmount,priceGhc:p.priceGhc,...campaignFields(p)};});
+  unfiltered=result.products.map(projectDirectCatalogBundle).filter((p:DataBundle|null):p is DataBundle=>p!==null);
   current=unfiltered.filter(offered);
   const c=result.campaign;campaign=c&&typeof c.label==='string'&&typeof c.title==='string'?{id:String(c.id),label:c.label,title:c.title,endDate:typeof c.endDate==='string'?c.endDate:null,maxSavingPercent:Number.isSafeInteger(c.maxSavingPercent)&&c.maxSavingPercent>0?c.maxSavingPercent:null}:null;
   confirmed=true;

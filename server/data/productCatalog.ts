@@ -1,10 +1,10 @@
-import { DIRECT_RETAIL_MINOR } from '../../shared/directPricing.js';
+import { AIRTELTIGO_ISHARE_CANDIDATES, DIRECT_RETAIL_MINOR } from '../../shared/directPricing.js';
 /**
  * Server-Authoritative Product Catalog
  * The browser is NEVER trusted for bundle prices or network attributes.
  * Prices are stored in pesewas (1 GHS = 100 Pesewas) to avoid floating point errors.
  *
- * Current canonical supplier catalog:
+ * Active canonical retail products (separate from provider API availability):
  * - MTN Express: 1GB, 2GB, 3GB, 4GB, 5GB, 6GB, 8GB, 10GB, 15GB, 20GB, 25GB, 30GB, 40GB
  * - AirtelTigo: 1GB, 2GB, 3GB, 4GB, 5GB
  * - Telecel Expiry: 10GB, 15GB, 20GB, 25GB, 30GB, 40GB, 50GB, 100GB
@@ -249,6 +249,19 @@ export const AUTHORITATIVE_PRODUCTS: Record<string, AuthoritativeProduct> = {
     isActive: true,
     description: 'Monthly worry-free browsing with AT simple pricing',
   },
+
+  // Sizes pending API entitlement, validity and founder pricing approval. No validity claim yet.
+  ...Object.fromEntries(AIRTELTIGO_ISHARE_CANDIDATES.map(({id, dataAmount, proposedRetailMinor}) => [id, {
+    id,
+    network: 'airteltigo',
+    networkName: 'AirtelTigo (AT)',
+    dataAmount,
+    priceGhc: proposedRetailMinor / 100,
+    amountPesewas: proposedRetailMinor,
+    currency: 'GHS',
+    isActive: false,
+    description: 'AirtelTigo iShare data bundle',
+  } satisfies AuthoritativeProduct])),
 
   // ==========================================
   // TELECEL GHANA Expiry
