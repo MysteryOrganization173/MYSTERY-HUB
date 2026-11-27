@@ -70,7 +70,10 @@ test('the status route is public, read-only, cacheable and off without the setti
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('cache-control'), 'public, max-age=300');
   const body = await res.json();
-  assert.deepEqual(Object.keys(body).sort(), ['active', 'date', 'daysToChristmas', 'daysToNewYear', 'greetings', 'pack', 'phase', 'source']);
+  // 3.6.4 added scheduledPack (the pack the setting switches on, even before its first day) and serverTime (so a
+  // phone with a wrong clock still changes on the right Accra day); both are checked in christmasGrandFinale364.
+  assert.deepEqual(Object.keys(body).sort(), ['active', 'date', 'daysToChristmas', 'daysToNewYear', 'greetings', 'pack', 'phase', 'scheduledPack', 'serverTime', 'source']);
+  assert.equal(body.scheduledPack, null);
   // Mystery Greetings: this server has no creator, so it reports none (both homepages show "Coming soon").
   assert.deepEqual(body.greetings, { createPath: null });
   assert.equal(body.active, false);
@@ -123,7 +126,9 @@ test('every Christmas style is scoped to the seasonal shell, so switching off re
     }
     selectors.push(current.trim());
     for (const selector of selectors.filter(Boolean)) {
-      assert.match(selector, /^\.mh-app\[data-season="christmas"\]/, selector);
+      // 3.6.4: the accent rules are shared with signed-in customers (data-season-audience="member"), which exists only
+      // while a pack applies, so switching off still restores the normal appearance exactly.
+      assert.match(selector, /^\.mh-app(\[data-season="christmas"\]|:is\(\[data-season="christmas"\], \[data-season-audience="member"\]\)|\[data-season-audience="member"\])/, selector);
       // Bare element selectors right under the shell could reach Website Builder template previews rendered inside
       // it. (Elements inside a named component, such as [data-dialog-variant="auth"] h2, are scoped by that hook.)
       assert.doesNotMatch(selector, /^\.mh-app\[data-season="christmas"\](?:\[[^\]]+\]|:has\([^)]*\))* (header|footer|main|section|nav|button|a|img|h[1-6])\b/, selector);
@@ -164,7 +169,8 @@ test('checkout stays untouched: decoration only, and celebration only for an ord
   // Delivered means the server's own status, never a device record's last known state or an operator remedy.
   assert.match(read('src/utils/orderReceiptPresentation.ts'), /supplierDelivered: order\.serverStatus === 'delivered' && !resolution && delivered,/);
   const css = read('src/seasonal/christmas/christmas.css');
-  assert.match(css, /\.mh-app\[data-season="christmas"\] \.mh-sheet::after \{[^}]*pointer-events: none/);
+  // 3.6.4: the same ribbon for members, and never on a serious sheet (data-sheet-mood / data-rc-mood).
+  assert.match(css, /\.mh-sheet:not\(\[data-rc-mood="serious"\], \[data-sheet-mood="serious"\]\)::after \{[^}]*pointer-events: none/);
   const pack = read('src/seasonal/christmas/ChristmasPack.tsx');
   assert.doesNotMatch(pack, /initializePayment|paystack|setActivePage\(|openCheckout|fetch\(/i, 'the pack performs no commerce or network action');
 });
@@ -237,11 +243,13 @@ test('every Christmas homepage style lives in its own xh- namespace, with transf
   // Transitions move transform only (the envelope flap also swaps its stacking order in one step, at the moment it
   // stands edge-on: a discrete z-index change, not an animated one).
   for (const [, value] of css.matchAll(/transition:\s*([^;]+);/g)) assert.match(value, /^(transform [^,]+(, z-index 0s [\d.]+s)?|none !important)$/, value);
-  // Endless loops only on large hover screens that welcome motion, and only while the hero is on screen.
-  const loops = css.split('\n').filter(line => /infinite/.test(line));
-  assert.ok(loops.length > 0);
+  // 3.6.4: no endless loops at all. The idle moment is finite, only on large hover screens that welcome motion, and
+  // only once the hero has been on screen.
+  assert.equal(css.split('\n').filter(line => /infinite/.test(line)).length, 0);
   const idle = css.slice(css.indexOf('@media (min-width: 900px) and (hover: hover) and (prefers-reduced-motion: no-preference) {'));
-  for (const line of loops) { assert.ok(idle.includes(line), line); assert.match(line, /^\s*\.xh-hero\[data-xh-visible\]/, line); }
+  const idleLines = idle.slice(0, idle.indexOf('\n}')).split('\n').filter(line => /animation:/.test(line));
+  assert.ok(idleLines.length >= 4);
+  for (const line of idleLines) assert.match(line, /^\s*\.xh-hero\[data-xh-visible\]/, line);
   // Reduced motion: every animation and transition stops, and no section waits for a reveal.
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.xh-home \*, \.xh-home \*::before, \.xh-home \*::after \{ animation: none !important; transition: none !important; \}/);
   assert.match(read('src/seasonal/christmas/kit/motion.ts'), /if \(prefersReducedMotion\(\) \|\| typeof IntersectionObserver === 'undefined'\) \{ items\.forEach\(settle\); return; \}/);

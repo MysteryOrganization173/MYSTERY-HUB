@@ -317,7 +317,7 @@ export function WebsitePlansAndUltra({
               {/* Clean integrated studio status badge (mobile-safe layout) */}
               <div className="absolute bottom-2.5 sm:bottom-3 inset-x-2.5 sm:inset-x-3 flex flex-wrap sm:flex-nowrap items-center justify-between gap-1.5 sm:gap-2 pointer-events-none">
                 <div className="min-w-0 flex-1 sm:flex-initial px-2.5 sm:px-3 py-1 rounded-full bg-[#0c1813]/90 backdrop-blur-md border border-[#00c365]/20 text-[9px] sm:text-[10px] font-medium text-slate-200 shadow-sm flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00c365] shrink-0 mh-brief-pulse" />
                   <span className="truncate">Handcrafted by Mystery Hub Engineers</span>
                 </div>
                 <span className="text-[9px] sm:text-[10px] font-mono font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-[#00c365]/20 text-[#00c365] border border-[#00c365]/30 shrink-0 backdrop-blur-md whitespace-nowrap">

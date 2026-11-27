@@ -724,7 +724,7 @@ export const MarketplacePage: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 text-left">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00c365]/15 border border-[#00c365]/40 flex items-center justify-center text-[#00c365] shrink-0 shadow-inner">
-                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] motion-safe:animate-pulse" aria-hidden="true" />
+                <Radio className="w-4 h-4 sm:w-5 sm:h-5 text-[#00c365] mh-brief-pulse" aria-hidden="true" />
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">

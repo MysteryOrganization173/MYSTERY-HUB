@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { serverSeasonStatus } from '../../shared/seasonal.js';
+import { parseSeasonSetting, serverSeasonStatus } from '../../shared/seasonal.js';
 import { greetingCreationAvailable, greetingCreationOffered } from '../services/experienceService.js';
 
 /**
@@ -15,12 +15,17 @@ seasonalRouter.get('/status', async (_req, res) => {
   // Short public caching: a change of the setting reaches visitors within minutes, and every visitor sees the same answer.
   // While greetings are switched on, within about a minute, so a storage change (or a brief hiccup) never lingers.
   res.setHeader('Cache-Control', greetingCreationOffered() ? 'public, max-age=60' : 'public, max-age=300');
-  const { active, pack, phase, date, daysToChristmas, daysToNewYear, source } = serverSeasonStatus(process.env.SEASONAL_EXPERIENCE);
+  const now = new Date();
+  const { active, pack, phase, date, daysToChristmas, daysToNewYear, source } = serverSeasonStatus(process.env.SEASONAL_EXPERIENCE, now);
+  // 3.6.4: which pack the setting has switched on, even before its first day or after its last, so a page left open on
+  // 30 November changes on its own at midnight (an inactive answer is not proof that the season is off); and the
+  // server's clock, so a phone whose clock is wrong still changes on the right Accra day. Presentation facts only.
+  const scheduledPack = parseSeasonSetting(process.env.SEASONAL_EXPERIENCE);
   // Mystery Greetings creator: reported only while a new greeting would really be accepted: both greeting gates on
   // (MYSTERY_GREETING_LINKS_ENABLED and MYSTERY_GREETINGS_ENABLED), the abuse secret configured, the optional schema
   // installed and retention clean-up not overdue. Until then both seasonal homepages say "Coming soon". Never throws.
   const greetings = { createPath: await greetingCreationAvailable().catch(() => false) ? '/greetings' : null };
-  res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source, greetings });
+  res.json({ active, pack, phase, date, daysToChristmas, daysToNewYear, source, scheduledPack, serverTime: now.toISOString(), greetings });
   } catch {
     res.status(503).set('Cache-Control', 'no-store').json({ error: 'Seasonal status is unavailable.' });
   }

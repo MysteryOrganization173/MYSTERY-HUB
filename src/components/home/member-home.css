@@ -75,7 +75,7 @@
 .member-order-attention .member-order-status { background: #3a2a0b; color: #fcd34d; }
 .member-order-done .member-order-status { background: #10301f; color: #7ee2aa; }
 .member-order-closed .member-order-status { background: #1c252c; color: #c3ced6; }
-.member-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #5cc8ff; box-shadow: 0 0 0 0 #5cc8ff88; animation: member-pulse 2s ease-out infinite; }
+.member-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #5cc8ff; box-shadow: 0 0 0 0 #5cc8ff88; animation: member-pulse 1.6s ease-out 3; }
 @keyframes member-pulse { 70% { box-shadow: 0 0 0 7px #5cc8ff00; } 100% { box-shadow: 0 0 0 0 #5cc8ff00; } }
 /* Progress: a step lights only when the server status has reached it. */
 .member-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

@@ -71,6 +71,7 @@
 .sd-card-meta { color: var(--sd-text-3); font-size: .75rem; }
 .sd-networks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .sd-networks span { padding: 2px 8px; border-radius: 6px; background: #0a1210; border: 1px solid #1d2b25; color: var(--sd-text-2); font-size: .6875rem; font-weight: 600; }
+.sd-networks span.is-paused { border-color: #f2c46d40; background: #f2c46d12; color: #f2d79a; }
 
 /* Featured: the everyday purchases and the free website, with a little more presence. */
 .sd-card-featured { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 11%, #0d1513) 0%, var(--sd-surface) 62%); border-color: color-mix(in srgb, var(--accent) 22%, var(--sd-line)); }

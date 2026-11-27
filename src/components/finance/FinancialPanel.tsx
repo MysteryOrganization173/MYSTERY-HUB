@@ -90,6 +90,8 @@ export const FinancialPanel:React.FC<{mode:'wallet'|'earn';earnLayout?:(parts:Ea
     return <div className="earn-finance">{balance}{form}{milestones}{history}</div>;
   }
   return <section className="min-w-0 rounded-2xl border border-slate-800 bg-[#0b1116] p-4 sm:p-6 text-left text-slate-100 space-y-5">
+    {/* 3.6.4: one quiet seasonal line for a member's Wallet; never beside an account that needs review. */}
+    {mode==='wallet'&&!data?.restricted&&<Seasonal slot="page" page="wallet" />}
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold">{mode==='wallet'?'Mystery Wallet':'Your earnings'}</h2><p className="text-sm text-slate-400">{mode==='wallet'?'Use your existing balance for eligible Data and Airtime purchases. New online top-ups are unavailable. Wallet funds cannot be withdrawn.':'Available funds from your financial account. Referral totals are shown separately.'}</p></div><button onClick={()=>void refresh()} className="text-sm text-[#00c365]" disabled={busy}>Refresh</button></div>
     {error&&<p role="alert" className="break-words text-sm text-amber-300">{error}</p>}{notice&&<p role="status" className="break-words text-sm text-emerald-300">{notice}</p>}
     {!data?<p role="status">Loading your balance…</p>:<>

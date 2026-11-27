@@ -61,7 +61,8 @@ export const PAGE_LINE: Record<SeasonPage, { christmas: string; newYear: string 
   afa: { christmas: 'Season’s greetings', newYear: 'Happy New Year' },
   checkers: { christmas: 'Season’s greetings', newYear: 'Happy New Year' },
   help: { christmas: 'Holiday questions? Start here', newYear: 'New year questions? Start here' },
-  about: { christmas: 'Merry Christmas from Mystery Hub', newYear: 'Happy New Year from Mystery Hub' },
+  // 3.6.4: short enough to sit beside the ornaments on a 320 px phone (the longer greeting was cut off).
+  about: { christmas: 'Merry Christmas, Ghana', newYear: 'Happy New Year, Ghana' },
   orders: { christmas: 'Christmas orders, tracked', newYear: 'New year orders, tracked' },
   app: { christmas: 'On your phone this Christmas', newYear: 'On your phone this year' },
   earn: { christmas: 'Share the season with friends', newYear: 'Share the new year with friends' },

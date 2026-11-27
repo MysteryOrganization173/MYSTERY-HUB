@@ -101,3 +101,14 @@ export function useOpenNetworkChoice<N extends string>(service: string, networks
   const network = !chosen.byCustomer && purchasePaused(service, chosen.network, status) ? firstOpen() : chosen.network;
   return [network, (next: N) => setChosen({ network: next, byCustomer: true })];
 }
+
+const NETWORK_LABELS: [string, string][] = [['mtn', 'MTN'], ['telecel', 'Telecel'], ['airteltigo', 'AirtelTigo']];
+/**
+ * 3.6.4: the networks currently open for new purchases of a service, for short copy such as "MTN, Telecel & AirtelTigo"
+ * on service cards. A paused network is left out, so no card advertises it; null when every network is paused.
+ */
+export function openNetworksLabel(service: string, status: ServiceStatus = current): string | null {
+  const open = NETWORK_LABELS.filter(([id]) => !purchasePaused(service, id, status)).map(([, name]) => name);
+  if (!open.length) return null;
+  return open.length === 1 ? open[0] : `${open.slice(0, -1).join(', ')} & ${open[open.length - 1]}`;
+}
