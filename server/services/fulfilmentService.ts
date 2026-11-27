@@ -1,3 +1,4 @@
+import { usesQualifiedIShareOffer } from '../suppliers/successBizHub/catalogResolver.js';
 import {recipientVerification} from '../suppliers/recipientVerification.js';
 import { FinanceError } from '../db/financeStore.js';
 import { CommercialService } from './commercialService.js';
@@ -105,11 +106,14 @@ export class FulfilmentService {
     bundleSize: string,
     recipientPhone: string
   ): Promise<PreflightResult> {
+    const qualifiedIShare = usesQualifiedIShareOffer(network,bundleSize);
     const isEnabled = this.provider.client.isFulfillmentEnabled();
 
     // When fulfillment is disabled, preserve test payment flow without calling supplier
     if (!isEnabled) {
-      return { allowed: true };
+      return qualifiedIShare
+        ? { allowed: false, code: 'SERVICE_TEMPORARILY_UNAVAILABLE', customerMessage: 'This bundle is temporarily unavailable.' }
+        : { allowed: true };
     }
 
     if (!this.provider.client.isConfigured()) {
@@ -130,12 +134,13 @@ export class FulfilmentService {
       const [servicesCheckResult, resolvedResult] = await Promise.all([
         (async () => {
           const s0 = performance.now();
-          const res = await this.provider.checkServicesAvailable();
+          const res = await this.provider.checkServicesAvailable(qualifiedIShare);
           return { res, ms: Math.round(performance.now() - s0) };
         })(),
         (async () => {
           const c0 = performance.now();
-          const res = await this.provider.resolvePackage(network, bundleSize);
+          const catalog = qualifiedIShare ? await this.provider.getRawCatalog(true) : undefined;
+          const res = await this.provider.resolvePackage(network, bundleSize, catalog);
           return { res, ms: Math.round(performance.now() - c0) };
         })(),
       ]);
@@ -186,7 +191,7 @@ export class FulfilmentService {
         (async () => {
           const w0 = performance.now();
           try {
-            const res = await this.provider.getBalance();
+            const res = await this.provider.getBalance(qualifiedIShare);
             return { res, ms: Math.round(performance.now() - w0), error: null };
           } catch (walletErr) {
             return { res: null, ms: Math.round(performance.now() - w0), error: walletErr };
@@ -209,7 +214,8 @@ export class FulfilmentService {
         };
       }
 
-      if (walletResult.error || !walletResult.res) {
+      if (walletResult.error || !walletResult.res || (qualifiedIShare &&
+          (walletResult.res.currency !== 'GHS' || !Number.isSafeInteger(walletResult.res.balancePesewas)))) {
         noteSalesFailure('wallet','supplier_response',true);
         console.warn('[Fulfilment Preflight] Wallet check unavailable; failing closed.');
         return {
@@ -654,10 +660,14 @@ export class FulfilmentService {
     let storeSupplierId:string|undefined;
     // 4-Data: Live dispatch to Success Biz Hub Data catalog
     try {
-      // 4a. Resolve live supplier package
+      // Revalidate the added iShare plans against fresh supplier terms before the existing snapshot checks.
+      const catalog = usesQualifiedIShareOffer(claimedOrder.network, claimedOrder.bundle_size_snapshot)
+        ? await provider.getRawCatalog(true)
+        : undefined;
       const resolution = await provider.resolvePackage(
         claimedOrder.network,
-        claimedOrder.bundle_size_snapshot
+        claimedOrder.bundle_size_snapshot,
+        catalog
       );
 
       if (!resolution.resolved) {
