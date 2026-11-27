@@ -15,6 +15,8 @@ export const LAST_KNOWN_MS = 7 * 24 * 60 * 60_000;
 export const VISIBLE_REFRESH_MS = 30 * 60_000;
 /** Back in the foreground (or online again): ask again if the last answer is older than this. */
 export const FOREGROUND_REFRESH_MS = 5 * 60_000;
+/** A stored clock correction is reused for at most a day; after that the page measures it again. */
+export const SKEW_KEEP_MS = 24 * 60 * 60_000;
 /** A device clock further than this from the server's is not trusted: the page uses the server's time instead. */
 export const SKEW_TRUST_MS = 10 * 60_000;
 /** Give up on one status request after this long; the page keeps its last answer meanwhile. */
@@ -71,7 +73,7 @@ export function usableStoredSeason(raw: unknown, nowMs: number): StoredSeason | 
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as { pack?: unknown; at?: unknown; skew?: unknown };
   if (typeof r.at !== 'number' || !Number.isFinite(r.at) || r.at > nowMs + 60_000 || nowMs - r.at > LAST_KNOWN_MS) return null;
-  const skew = typeof r.skew === 'number' && Number.isFinite(r.skew) && Math.abs(r.skew) <= MAX_SKEW_MS ? r.skew : 0;
+  const skew = typeof r.skew === 'number' && Number.isFinite(r.skew) && Math.abs(r.skew) <= MAX_SKEW_MS && nowMs - r.at <= SKEW_KEEP_MS ? r.skew : 0;
   return { pack: r.pack === null ? null : parseSeasonSetting(r.pack), at: r.at, skew };
 }
 

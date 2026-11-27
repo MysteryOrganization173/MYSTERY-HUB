@@ -72,8 +72,8 @@
 .mh-ds .mh-ds-signal-rings, .mh-ds .mh-ds-signal-orbit, .mh-ds .mh-ds-signal-core { transform-box: view-box; transform-origin: 170px 150px; }
 /* Ambient motion is finite (it settles after about half a minute) and pauses while the panel is off-screen. */
 .mh-ds .mh-ds-signal-rings { animation: mh-ds-breathe 4.8s ease-in-out 1; } /* 3.6.4: one breath, then still (under 5 s) */
-.mh-ds .mh-ds-signal-orbit { animation: mh-ds-orbit 38s linear 1; }
-.mh-ds .mh-ds-signal-orbit.is-slow { animation-duration: 64s; animation-direction: reverse; }
+.mh-ds .mh-ds-signal-orbit { animation: mh-ds-orbit 4.8s cubic-bezier(.2, .7, .2, 1) 1 forwards; } /* 3.6.4: a gentle part-turn that rests, under 5 s (was one 38 s turn) */
+.mh-ds .mh-ds-signal-orbit.is-slow { animation-name: mh-ds-orbit-back; }
 .mh-ds .mh-ds-signal-core { animation: mh-ds-core 2.4s ease-in-out 2; }
 .mh-ds .mh-ds-hero[data-ds-idle] * { animation-play-state: paused !important; }
 .mh-ds .mh-ds-art-wait { width: 100%; aspect-ratio: 240 / 206; }
@@ -295,7 +295,8 @@
 @keyframes mh-ds-swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes mh-ds-search-in { from { opacity: 0; transform: scaleX(.92); } to { opacity: 1; transform: none; } }
 @keyframes mh-ds-breathe { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.035); opacity: .82; } }
-@keyframes mh-ds-orbit { to { transform: rotate(360deg); } }
+@keyframes mh-ds-orbit { to { transform: rotate(40deg); } }
+@keyframes mh-ds-orbit-back { to { transform: rotate(-24deg); } }
 @keyframes mh-ds-core { 0%, 100% { opacity: .9; } 50% { opacity: .6; } }
 @keyframes mh-ds-skeleton { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 @keyframes mh-ds-hero-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

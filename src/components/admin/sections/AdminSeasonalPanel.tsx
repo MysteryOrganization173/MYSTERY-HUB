@@ -22,6 +22,9 @@ const longDate = (date: string) => new Date(date + 'T12:00:00Z').toLocaleDateStr
 /** What the setting means today: on, set and waiting for its first day, set but finished, or off. */
 export function settingState(status: PanelStatus): { tone: 'success' | 'info' | 'neutral'; label: string } {
   if (status.active) return { tone: 'success', label: `On for everyone · ${status.pack}` };
+  // An API from before 3.6.4 cannot say whether the setting is present (the site and API deploy separately): never
+  // report "Off" from silence, which could prompt an unneeded production change.
+  if (!('scheduledPack' in status)) return { tone: 'neutral', label: 'Not on for customers today · this API version does not report whether the setting is present' };
   if (status.scheduledPack && status.date < CHRISTMAS_2026.start) return { tone: 'info', label: `Set · starts on its own on ${longDate(CHRISTMAS_2026.start)}` };
   if (status.scheduledPack) return { tone: 'neutral', label: 'Set, but the season has ended (ordinary appearance)' };
   return { tone: 'neutral', label: 'Off (setting not present)' };

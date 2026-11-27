@@ -161,7 +161,7 @@ export function StringLights({ count = 12, sag = 22, className = '', swags = 2 }
       <svg className="xmas-lights-wire" viewBox={`0 0 1000 ${sag + 26}`} preserveAspectRatio="none" focusable="false"><path d={path} fill="none" stroke="#3b4a3f" strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg>
       {bulbs.map((t, i) => (
         <i key={i} className={`xmas-bulb ${i % 3 === 1 ? 'xmas-bulb-twinkle' : ''}`}
-          style={{ left: `${t * 100}%`, top: y(t), '--bulb': BULB_TONES[i % BULB_TONES.length], animationDelay: `${(i * 0.7) % 4}s` } as React.CSSProperties} />
+          style={{ left: `${t * 100}%`, top: y(t), '--bulb': BULB_TONES[i % BULB_TONES.length], animationDelay: `${(i % 4) * 0.15}s` } as React.CSSProperties} />
       ))}
     </div>
   );

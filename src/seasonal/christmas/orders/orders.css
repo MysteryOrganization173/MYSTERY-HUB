@@ -50,7 +50,7 @@
 .mh-or[data-or-season="christmas"] .mh-orx-bow { animation: mh-orx-bow .6s cubic-bezier(.34, 1.4, .5, 1) .7s backwards; transform-box: fill-box; transform-origin: center; }
 .mh-or[data-or-season="christmas"] .mh-orx-charm { animation: mh-orx-sway 2s ease-in-out .9s 2; transform-box: view-box; transform-origin: 96px 2px; }
 .mh-or[data-or-season="christmas"] .mh-orx-halo { animation: mh-orx-fade 1.2s ease-out backwards; }
-.mh-or[data-or-season="christmas"] .mh-orx-spark { animation: mh-orx-glint 1.8s ease-in-out calc(1s + var(--i, 0) * .25s) 2; transform-box: fill-box; transform-origin: center; }
+.mh-or[data-or-season="christmas"] .mh-orx-spark { animation: mh-orx-glint 1.8s ease-in-out calc(.6s + var(--i, 0) * .2s) 2; transform-box: fill-box; transform-origin: center; }
 
 /* A receipt that is going well: a fine gold rim on the slip and a small ornament rule. Problems never get this. */
 .mh-rc[data-or-season="christmas"] { --rc-paper-a: #13241c; --rc-paper-b: #0d1813; --rc-edge: #e9b94938; }

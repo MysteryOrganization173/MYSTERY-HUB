@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { openNetworksLabel, useServiceStatus } from '../../hooks/useServiceStatus';
+import { airtimeCardLine, openNetworksLabel, pausedLabel, useServiceStatus } from '../../hooks/useServiceStatus';
 import { Wifi, Smartphone, Globe, Gift, ShieldCheck, Store, ArrowRight } from 'lucide-react';
 
 type Service = { id: string; title: string; desc: string; icon: React.ComponentType<{ className?: string }>; action: () => void; tag: string; tone: 'live' | 'free' | 'neutral' };
@@ -9,10 +9,11 @@ type Service = { id: string; title: string; desc: string; icon: React.ComponentT
 export const QuickServicesBar: React.FC = () => {
   const { setActivePage, openDataPage } = useApp();
   // 3.6.4: only the networks selling now are named; a paused network is never advertised (Service Control Center).
-  const dataNetworks = openNetworksLabel('data', useServiceStatus());
+  const serviceStatus = useServiceStatus();
+  const dataNetworks = openNetworksLabel('data', serviceStatus), airtimeOpen = openNetworksLabel('airtime', serviceStatus);
   const services: Service[] = [
-    { id: 'data', title: 'Data Bundles', desc: dataNetworks ?? 'Paused for maintenance', icon: Wifi, action: () => openDataPage('data'), tag: dataNetworks ? 'Available' : 'Paused', tone: dataNetworks ? 'live' : 'neutral' },
-    { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', icon: Smartphone, action: () => openDataPage('airtime'), tag: 'Available', tone: 'live' },
+    { id: 'data', title: 'Data Bundles', desc: dataNetworks ?? pausedLabel('data', serviceStatus), icon: Wifi, action: () => openDataPage('data'), tag: dataNetworks ? 'Available' : 'Paused', tone: dataNetworks ? 'live' : 'neutral' },
+    { id: 'airtime', title: 'Airtime Top-Up', desc: airtimeCardLine(serviceStatus), icon: Smartphone, action: () => openDataPage('airtime'), tag: airtimeOpen ? 'Available' : 'Paused', tone: airtimeOpen ? 'live' : 'neutral' },
     { id: 'website', title: 'Website Builder', desc: 'A website for your business', icon: Globe, action: () => setActivePage('website'), tag: 'Free plan', tone: 'free' },
     { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', icon: Gift, action: () => setActivePage('earn'), tag: 'Available', tone: 'live' },
     { id: 'afa', title: 'AFA Registration', desc: 'Existing registrations and support', icon: ShieldCheck, action: () => setActivePage('afa'), tag: 'Check Status', tone: 'neutral' },

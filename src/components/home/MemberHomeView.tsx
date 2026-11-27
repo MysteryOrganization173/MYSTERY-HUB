@@ -5,7 +5,7 @@ import type {NetworkId} from '../../types';
 import {memberOrderSelection,memberOrderLabel,memberOrderTone,memberOrderSteps,memberOrderNext,memberReorder} from '../../utils/memberHomePresentation';
 import {formatGhs} from '../../../shared/money';
 import {BUSINESS_CONFIG} from '../../config/business';
-import {openNetworksLabel,useServiceStatus} from '../../hooks/useServiceStatus';
+import {airtimeCardLine,openNetworksLabel,pausedLabel,useServiceStatus} from '../../hooks/useServiceStatus';
 
 /** What the account's existing Website Builder record says, when it has loaded. */
 export type MemberWebsiteSummary={state:'none'}|{state:'draft'|'published';name:string;slug:string};
@@ -76,7 +76,8 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
   const {latest,recent,prioritizesActive}=memberOrderSelection(orders);
   const tone=!loading&&!error&&latest?memberOrderTone(latest):null;
   // 3.6.4: the Buy Data tile names only the networks selling now (Service Control Center).
-  const dataNetworks=openNetworksLabel('data',useServiceStatus());
+  const serviceStatus=useServiceStatus();
+  const dataNetworks=openNetworksLabel('data',serviceStatus);
   // A purchase that needs the customer, or is still moving, comes before new buying.
   const urgent=tone==='attention'||tone==='active';
   const subline=tone==='attention'?'One of your orders needs attention.':tone==='active'?(prioritizesActive?'You have an order in progress.':'Your latest order is in progress.'):!loading&&!error&&!latest?'Welcome to Mystery Hub. Let’s get you connected.':'What would you like to do today?';
@@ -103,12 +104,12 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
         <section aria-label="Buy now" className="member-buy">
           <button className="member-buy-tile member-buy-data" onClick={()=>actions.data()}>
             <span className="member-buy-icon"><Wifi className="size-5" aria-hidden="true"/></span>
-            <span className="member-buy-text"><strong>Buy Data</strong><span>{dataNetworks ?? 'Paused for maintenance'}</span></span>
+            <span className="member-buy-text"><strong>Buy Data</strong><span>{dataNetworks ?? pausedLabel('data',serviceStatus)}</span></span>
             <ArrowRight className="member-buy-arrow size-5" aria-hidden="true"/>
           </button>
           <button className="member-buy-tile member-buy-airtime" onClick={()=>actions.airtime()}>
             <span className="member-buy-icon"><Smartphone className="size-5" aria-hidden="true"/></span>
-            <span className="member-buy-text"><strong>Airtime</strong><span>Top up any Ghana number</span></span>
+            <span className="member-buy-text"><strong>Airtime</strong><span>{airtimeCardLine(serviceStatus)}</span></span>
             <ArrowRight className="member-buy-arrow size-5" aria-hidden="true"/>
           </button>
         </section>

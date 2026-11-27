@@ -130,7 +130,8 @@ export function AnnouncementModal({ page, blocked }: { page: string; blocked: bo
     return () => { if (dialog.open) dialog.close(); };
   }, [shownKey]);
   if (!shown) return null;
-  const close = () => setSeen(addKey(MODAL_KEY, keyOf(shown)));
+  // Close the native dialog before it leaves the page, so focus returns to where the customer was (3.6.4).
+  const close = () => { if (dialogRef.current?.open) dialogRef.current.close(); setSeen(addKey(MODAL_KEY, keyOf(shown))); };
   const restoration = restorationFor(shown, status.controls, status.serverDate);
   const cta = shown.cta ? ANNOUNCEMENT_CTAS[shown.cta] : null;
   return (

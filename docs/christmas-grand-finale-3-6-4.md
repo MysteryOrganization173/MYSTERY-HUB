@@ -55,7 +55,7 @@ Every customer page was rendered: ordinary and Christmas, guest and member, at 3
 
 These are presentation facts only. Nothing a request sends can change them.
 
-**The page** (`src/seasonal/SeasonProvider.tsx` and `src/seasonal/seasonClock.ts`):
+**The page** (`src/seasonal/SeasonProvider.tsx`, with the scheduling in `src/seasonal/seasonSync.ts` and the rules in `src/seasonal/seasonClock.ts`):
 - **Works out the Accra day itself.** Ghana keeps GMT with no daylight saving, so a timer fires at the next 00:00 UTC. Phases change at midnight without any request: 1 December, 25, 26 and 27 December, 31 December, 1 January, and back to normal on 6 January.
 - **Asks the server again only when the answer could change:**
   - just after midnight, at a random moment in the first 30 s so open pages don't all ask at once;
@@ -63,7 +63,12 @@ These are presentation facts only. Nothing a request sends can change them.
   - when the connection returns;
   - every 30 minutes while visible.
 - **Controls its requests.** One request runs at a time, with an 8 s timeout. After a failure, retries back off: 30 s, 1 min, 2 min, and so on up to 10 min.
-- **Corrects a wrong clock.** A phone more than 10 minutes from the server's clock is corrected. That is longer than the status can be cached, so a cached answer never shifts a correct phone. An answer more than a year out is treated as broken and ignored.
+- **Corrects a wrong clock,** without ever being misled by a cached answer:
+  - A phone more than 10 minutes from the server's clock is corrected, and the midnight timer is re-armed at once.
+  - The correction is taken only from a fresh answer. A cached answer that disagrees (another day, or more than 10 minutes out) triggers one fresh check instead.
+  - A stored correction is reused for a day at most.
+  - An answer more than a year out is treated as broken and ignored.
+- **Keeps the retry backoff.** After a failure, returning to the tab does not bypass it.
 - **Offline,** the last server answer stands for up to 7 days, always within the pack's dates. After that the page is ordinary until the server answers. Answers stored before 3.6.4 are ignored, so the first visit after deploy asks the server.
 - **Greetings readiness** is refreshed with the season. When creation opens or closes, an open page offers or withdraws the creator, so it never shows a dead link.
 - **Preview is unchanged:** a per-tab `sessionStorage` override with a ribbon.
@@ -79,33 +84,38 @@ These are presentation facts only. Nothing a request sends can change them.
   - the member hero glints twice;
   - live dots pulse three times;
   - the Data and Orders art settle within five seconds.
-- **Ordinary pages.** The two endless ordinary-page pulses now pulse three times (`.mh-brief-pulse`).
+- **Ordinary pages.**
+  - The two endless ordinary-page pulses now pulse three times (`.mh-brief-pulse`).
+  - The Data page's slow signal orbit (one 38 s turn) is now a gentle part-turn of under 5 s that rests.
+- **Staggers count too.** The longest staggered sequences (header strand, Data bulbs and signal, member bulbs, Orders glints) were shortened so the last element also ends within about 5 s. This is measured in the browser from each animation's computed end time, inline delays included.
 - **What still loops** is real loading feedback only: skeletons, spinners and the sign-in busy indicator. The chip-row edge fade is scroll-driven and moves only while the customer scrolls.
 - **Reduced motion** keeps everything still, now including the member accents.
 
 ## 4. Integration
 
 **Service availability (Service Control Center):**
-- Service cards name only the networks selling now ("Telecel & AirtelTigo" while MTN Data is paused), or "Paused for maintenance" when none is. This covers the ordinary and Christmas guest homepages, both member homepages and More Services.
-- More Services marks a paused network's chip.
+- Data and Airtime cards name only the networks selling now ("Telecel & AirtelTigo" while MTN Data is paused). This covers the ordinary and Christmas guest homepages, both member homepages and More Services.
+  - Airtime keeps "any Ghana number" only while all three networks are open.
+  - With no network open, a card says "Paused for now". It says "Paused for maintenance" only when every paused control is maintenance, so no unverified reason is given.
+- More Services marks a paused network's chip, and lists a service with no network open as unavailable rather than "Available".
 - A delay never removes a network.
 - MTN Airtime and Instant Bundles are independent and stay listed.
 
 **Serious states stay plain.**
 - **Marked serious:**
   - the checkout's paused sheet;
-  - its refused, closed, recovering and active-MTN-order states (`data-sheet-mood="serious"`);
+  - its refused, closed, recovering, active-MTN-order and "Price not confirmed" states (`data-sheet-mood="serious"`);
   - receipts that need help or a refund review (`data-rc-mood="serious"`, from 3.6.2).
 - **Effect:** these never get the festive edge or ribbon, for guests (pack) or members (shell).
 - **No change:** the 3.6.2 celebration rules are untouched (one celebration, only for a delivery the receipt saw happen).
 
 **Members (Level B):**
 - Signed-in customers now get the same quiet seasonal line and ornament on shared pages: Services, About, Help, Website Builder, Creative Studio, Marketplace, AFA, Results Checkers, App, Wallet and Earn.
-- The Wallet line is hidden while an account is under review.
+- The Wallet and Earn lines are hidden while an account is under review, and until its record has loaded.
 - Only accent styles were widened to `[data-season-audience="member"]`. The guest background, header lights, footer greeting, sign-in styling, Help colours and celebrations stay guest-only.
 - Nothing renders while the account is still being checked.
 
-**Overlays.** The exceptional pop-up now registers with the shared overlay stack. While it is open the page holds still and invitations wait, as for every other dialog. No second coordination system was added.
+**Overlays.** The exceptional pop-up now registers with the shared overlay stack. While it is open the page holds still and invitations wait, as for every other dialog. Focus returns to where the customer was when it closes. No second coordination system was added.
 
 **Shell and phones.**
 - The logo hat, menu, footer and navigation are unchanged.
@@ -120,7 +130,7 @@ These are presentation facts only. Nothing a request sends can change them.
 **Help** answers "What does it mean when a service is paused?" without guarantees, and links to Orders.
 
 **Admin → System → Seasonal experience** now shows:
-- "Set · starts on its own on 1 December 2026", "On for everyone", "Set, but the season has ended" or "Off";
+- "Set · starts on its own on 1 December 2026", "On for everyone", "Set, but the season has ended" or "Off". An API from before this release (the site and API deploy separately) is shown as "does not report whether the setting is present", never as "Off";
 - the season dates and what happens on 6 January;
 - who sees what, including that serious states stay plain;
 - that the season is independent of MTN, Greetings, the campaign and storefront payments;
@@ -134,11 +144,11 @@ It still only reads.
 | Check | Result |
 |---|---|
 | Type-check, production build | Clean |
-| New suite `christmasGrandFinale364.test.ts` | 11/11 |
-| Full suite | 3,638 pass, 0 fail (62 opt-in database tests skipped) |
+| New suite `christmasGrandFinale364.test.ts`, including a behavioural scheduler test on mock timers (midnight, slow phone, small skew, foreground/reconnect/backoff, offline) | 16/16 |
+| Full suite | 3,643 pass, 0 fail (62 opt-in database tests skipped) |
 | Browser lifecycle, controlled clock (guest and member boundaries, open checkout across midnight, background, wrong clock, offline and reconnect, Greetings open and close, 6 January restoration, malformed previews) | 31/31 |
 | Customer journeys 1–10 plus phase days, widths 320/360/390/430/768/1280/1440 (guest and member, 8 pages each), failed seasonal chunk, blocked storage | 170/170 |
-| Performance, accessibility and motion (lab bytes, slow-phone lab LCP/CLS, axe on 14 seasonal pages, reduced motion, settled motion after 9 s at 1440, Pixel 7 and iPhone 13 emulation) | 37/37 |
+| Performance, accessibility and motion (lab bytes, slow-phone lab LCP/CLS, axe on 14 seasonal pages, reduced motion, settled motion, measured animation end times at 1440 and 390 for guest and member, Pixel 7 and iPhone 13 emulation) | 61/61 |
 | 3.6.3 Service Control browser checks, rerun | 111/111 and 107/107 |
 
 **Performance** (local lab, not field data):
@@ -176,7 +186,33 @@ It still only reads.
 
 Device checks were Chromium emulation only, which is not equivalent to physical testing.
 
-## 6. Financial, privacy and scope boundaries
+## 6. Independent review
+
+An independent reviewer read the full diff, ran the type-check, build and full suite, and tried to reproduce defects. Verdict: **ship after fixes**. Nothing broke a money, order, payment or privacy constraint, and every hard constraint was verified (calendar, preview isolation, no activation or configuration change, no scope leak, guest-only rules, serious-sheet rules, `scheduledPack`/`serverTime` privacy, copy, one overlay system, no polling, no flow resets).
+
+All eight findings are fixed, each with a test:
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | "Paused for maintenance" was claimed even for a suspension. More Services still badged the card "Available", and Airtime cards weren't availability-aware. | "Paused for now" unless every control is maintenance; unavailable badge; Airtime copy. |
+| 2 | Inline staggers pushed some "finite" motion to 6–7.6 s. The test ignored delays. | Staggers shortened; delays included in the stylesheet test; end times measured in the browser. |
+| 3 | The Earn accent showed beside an account under review, and the Wallet accent while the account was loading. | Shown only once the record has loaded and isn't under review. |
+| 4 | The midnight timer wasn't re-armed after the first clock correction. | Re-armed on every correction. |
+| 5 | A cached answer could set the clock correction, which was then kept for 7 days. | Taken only from fresh answers; reused for a day at most. |
+| 6 | Returning to the tab after a failure bypassed the retry backoff. | Throttled by the last attempt. |
+| 7 | Admin could say "Off" when the API is older than the site. | "Does not report whether the setting is present". |
+| 8 | The checkout's "Price not confirmed" state kept the festive edge. | Added to the serious states. |
+
+Minor suggestions also done:
+- Focus returns after the pop-up closes.
+- The retry timer is cleared on success.
+- The scheduler is now a pure module with behavioural tests.
+
+Left as they are, by design or as pre-existing:
+- Some static service descriptions and the Earn share text name all three networks.
+- The Marketplace accent shows no ornament at 400 px or less.
+
+## 7. Financial, privacy and scope boundaries
 
 **Not changed:** payment initialization, verification, webhooks, recovery, Wallet, suppliers, refunds, reconciliation, pricing, the December campaign (amounts or activation), managed storefront checkout and any restricted payment path.
 
@@ -184,7 +220,7 @@ Device checks were Chromium emulation only, which is not equivalent to physical 
 
 **Copy:** no supplier names, no outage claims, no refund promises and no date guarantees in new copy.
 
-## 7. Dependencies on Mystery Hub 3.5 (Codex)
+## 8. Dependencies on Mystery Hub 3.5 (Codex)
 
 1. **Greetings activation remains 3.5's:**
    - trusted-ingress evidence;
@@ -197,7 +233,7 @@ Device checks were Chromium emulation only, which is not equivalent to physical 
 2. **Caching.** The seasonal status is publicly cacheable (60–300 s). If a CDN is added in front of the API, keep that TTL short; the page's clock correction ignores differences under 10 minutes.
 3. **Earlier service-control items** stand as written in `docs/service-control-3-6-3.md`: settings backups, cross-instance staleness and payments in flight.
 
-## 8. December 1 launch runbook
+## 9. December 1 launch runbook
 
 ### A. Before activation (as of this release)
 

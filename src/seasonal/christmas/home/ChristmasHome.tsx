@@ -13,7 +13,7 @@ import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront,
 import { markSeen, prefersReducedMotion, press, pressEnd, seenThisVisit, swing, useMedia, useReveal } from '../kit/motion';
 import { WelcomeCard } from '../kit/WelcomeCard';
 // Real business logic, shared with the ordinary homepage: catalogue, offers, checkout, templates, Marketplace, FAQs.
-import { useServiceStatus, serviceControl, useOpenNetworkChoice, openNetworksLabel } from '../../../hooks/useServiceStatus';
+import { useServiceStatus, serviceControl, useOpenNetworkChoice, openNetworksLabel, pausedLabel, airtimeCardLine } from '../../../hooks/useServiceStatus';
 import { ServiceInlineNotice } from '../../../components/service/ServiceUpdate';
 import { directCampaign, directCatalogConfirmed, useDirectCatalog } from '../../../hooks/useDirectCatalog';
 import { useWelcomeOffer } from '../../../hooks/useWelcomeOffer';
@@ -144,10 +144,11 @@ function Services({ christmas }: { christmas: boolean }) {
   const { setActivePage, openDataPage } = useApp();
   // The same six destinations, labels and availability as the ordinary homepage (QuickServicesBar). 3.6.4: only the
   // networks selling now are named on the Data gift; a paused network is never wrapped up as available.
-  const dataNetworks = openNetworksLabel('data', useServiceStatus());
+  const serviceStatus = useServiceStatus();
+  const dataNetworks = openNetworksLabel('data', serviceStatus), airtimeOpen = openNetworksLabel('airtime', serviceStatus);
   const services: GiftService[] = [
-    { id: 'data', title: 'Data Bundles', desc: dataNetworks ?? 'Paused for maintenance', tag: dataNetworks ? 'Available' : 'Paused', tone: dataNetworks ? 'live' : 'neutral', wrap: 'pine', tie: 'satin-gold', art: <DataArt />, action: () => openDataPage('data') },
-    { id: 'airtime', title: 'Airtime Top-Up', desc: 'Top up any Ghana number', tag: 'Available', tone: 'live', wrap: 'berry', tie: 'satin-ivory', art: <AirtimeArt />, action: () => openDataPage('airtime') },
+    { id: 'data', title: 'Data Bundles', desc: dataNetworks ?? pausedLabel('data', serviceStatus), tag: dataNetworks ? 'Available' : 'Paused', tone: dataNetworks ? 'live' : 'neutral', wrap: 'pine', tie: 'satin-gold', art: <DataArt />, action: () => openDataPage('data') },
+    { id: 'airtime', title: 'Airtime Top-Up', desc: airtimeCardLine(serviceStatus), tag: airtimeOpen ? 'Available' : 'Paused', tone: airtimeOpen ? 'live' : 'neutral', wrap: 'berry', tie: 'satin-ivory', art: <AirtimeArt />, action: () => openDataPage('airtime') },
     { id: 'website', title: 'Website Builder', desc: 'A website for your business', tag: 'Free plan', tone: 'free', wrap: 'cream', tie: 'tag', art: <WebArt />, action: () => setActivePage('website') },
     { id: 'earn', title: 'Mystery Earn', desc: 'Refer friends & earn', tag: 'Available', tone: 'live', wrap: 'gold', tie: 'none', art: <EarnArt />, action: () => setActivePage('earn') },
     { id: 'afa', title: 'AFA Registration', desc: 'Existing registrations and support', tag: 'Check Status', tone: 'neutral', wrap: 'midnight', tie: 'pinstripe', art: <AfaArt />, action: () => setActivePage('afa') },

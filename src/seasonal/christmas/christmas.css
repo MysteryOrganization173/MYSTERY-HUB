@@ -43,7 +43,7 @@
 .mh-app[data-season="christmas"] .xmas-bulb { position: absolute; width: 8px; height: 12px; margin-left: -4px; border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; background: radial-gradient(circle at 40% 35%, #fff9 0 18%, var(--bulb) 46%); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--bulb) 55%, transparent); transform-origin: 50% 0; transform: translateY(1px) rotate(var(--tilt, 0deg)); }
 .mh-app[data-season="christmas"] .xmas-bulb::before { content: ''; position: absolute; left: 1.5px; top: -3px; width: 5px; height: 4px; border-radius: 1px; background: #4c5a4f; }
 /* 3.6.4: the strand twinkles twice as it arrives, then stays lit (under five seconds, never a loop). */
-.mh-app[data-season="christmas"] .xmas-bulb-twinkle { animation: xmas-twinkle 2.2s ease-in-out .4s 2; }
+.mh-app[data-season="christmas"] .xmas-bulb-twinkle { animation: xmas-twinkle 2.2s ease-in-out 2; } /* the strand staggers each bulb by at most .45 s (art.tsx) */
 
 /* Confirmed-outcome burst: plays once. */
 .mh-app[data-season="christmas"] .xmas-celebrate { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }

@@ -115,5 +115,6 @@ test('greetings: only the Mystery Greetings pages call its API, and ordinary pag
   assert.ok(files.some(f => own(f) && /\/api\/experiences\/greetings/.test(read(f))), 'the greetings pages use the public contract');
   // Only the provider and the two seasonal homepages use the entry; ordinary components (and the greetings pages) do not.
   const users = files.filter(f => !own(f) && /greetingsEntry|GreetingsEntry|GreetingsPreview|\.greetings\b|greetings=\{/.test(read(f))).map(f => f.replace(/\\/g, '/')).sort();
-  assert.deepEqual(users, ['src/seasonal/SeasonProvider.tsx', 'src/seasonal/christmas/home/ChristmasHome.tsx', 'src/seasonal/christmas/kit/GreetingsPreview.tsx', 'src/seasonal/christmas/member/ChristmasMemberHome.tsx', 'src/seasonal/christmas/member/ChristmasMemberView.tsx']);
+  // 3.6.4: seasonSync.ts carries the server's answer (including greetings) to the provider unchanged.
+  assert.deepEqual(users, ['src/seasonal/SeasonProvider.tsx', 'src/seasonal/christmas/home/ChristmasHome.tsx', 'src/seasonal/christmas/kit/GreetingsPreview.tsx', 'src/seasonal/christmas/member/ChristmasMemberHome.tsx', 'src/seasonal/christmas/member/ChristmasMemberView.tsx', 'src/seasonal/seasonSync.ts']);
 });

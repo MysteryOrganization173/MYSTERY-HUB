@@ -5,10 +5,8 @@ import {
   accraDate, greetingsEntry, GREETINGS_COMING_SOON, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, serverSeasonStatus,
   type GreetingsEntry, type SeasonalPackId, type SeasonStatus,
 } from '../../shared/seasonal';
-import {
-  BOUNDARY_SPREAD_MS, FOREGROUND_REFRESH_MS, LAST_KNOWN_MS, REQUEST_TIMEOUT_MS, VISIBLE_REFRESH_MS,
-  clockSkew, msUntilNextAccraDay, retryDelayMs, scheduledPackFrom, usableStoredSeason,
-} from './seasonClock';
+import { usableStoredSeason } from './seasonClock';
+import { startSeasonSync } from './seasonSync';
 
 /**
  * Seasonal Experience state for the customer site.
@@ -100,69 +98,34 @@ export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [today, setToday] = useState(() => accraDate(new Date(Date.now() + skew.current)));
   const [greetings, setGreetings] = useState<GreetingsEntry>(GREETINGS_COMING_SOON);
 
-  useEffect(() => {
-    let alive = true, inflight: Promise<void> | null = null, lastAnswer = initial?.at ?? 0, failures = 0;
-    let retryTimer = 0, boundaryTimer = 0, spreadTimer = 0;
-    const now = () => Date.now() + skew.current;
-    const tick = () => setToday(accraDate(new Date(now())));
-    // One request at a time; a fresh one (after load) skips the browser's copy so a midnight answer is today's.
-    const ask = (fresh: boolean): Promise<void> => {
-      if (inflight) return inflight;
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-      const sent = Date.now();
-      inflight = fetch(`${API_BASE_URL}/api/seasonal/status`, { headers: { Accept: 'application/json' }, signal: controller.signal, ...(fresh ? { cache: 'no-cache' as RequestCache } : {}) })
-        .then(res => (res.ok ? res.json() : null))
-        .then((data: { serverTime?: unknown; greetings?: unknown } | null) => {
-          if (!alive) return;
-          if (!data) throw new Error('Seasonal status unavailable');
-          // The server is the only authority on which pack is on; the page recomputes the phase from today's Accra date.
-          const pack = scheduledPackFrom(data);
-          skew.current = clockSkew(data.serverTime, sent, Date.now());
-          lastAnswer = Date.now(); failures = 0;
-          writeStorage(() => localStorage, CACHE_KEY, { pack, at: lastAnswer, skew: skew.current });
-          setScheduled(pack); tick();
-          setGreetings(greetingsEntry(data.greetings));
-        })
-        .catch(() => {
-          if (!alive) return;
-          failures += 1;
-          // Offline or blocked: the last answer stands while it is recent enough, never longer.
-          if (!lastAnswer || Date.now() - lastAnswer > LAST_KNOWN_MS) setScheduled(null);
-          window.clearTimeout(retryTimer);
-          if (document.visibilityState !== 'hidden') retryTimer = window.setTimeout(() => void ask(true), retryDelayMs(failures));
-        })
-        .finally(() => { window.clearTimeout(timeout); inflight = null; });
-      return inflight;
-    };
-    // At each Accra midnight: the new day applies at once on this device, then the server is asked (spread out).
-    const armBoundary = () => {
-      window.clearTimeout(boundaryTimer);
-      boundaryTimer = window.setTimeout(() => {
-        tick();
-        window.clearTimeout(spreadTimer);
-        spreadTimer = window.setTimeout(() => void ask(true), Math.random() * BOUNDARY_SPREAD_MS);
-        armBoundary();
-      }, msUntilNextAccraDay(now()) + 250);
-    };
-    // Back from the background or a sleep: timers may not have run, so the day is worked out again.
-    const onReturn = () => {
-      if (document.visibilityState === 'hidden') return;
-      tick(); armBoundary();
-      if (Date.now() - lastAnswer > FOREGROUND_REFRESH_MS) void ask(true);
-    };
-    const onOnline = () => { tick(); if (failures > 0 || Date.now() - lastAnswer > 60_000) void ask(true); };
-    const visible = window.setInterval(() => { if (document.visibilityState === 'visible') void ask(true); }, VISIBLE_REFRESH_MS);
-    void ask(false); armBoundary();
-    document.addEventListener('visibilitychange', onReturn);
-    window.addEventListener('focus', onReturn); window.addEventListener('pageshow', onReturn); window.addEventListener('online', onOnline);
-    return () => {
-      alive = false;
-      window.clearTimeout(retryTimer); window.clearTimeout(boundaryTimer); window.clearTimeout(spreadTimer); window.clearInterval(visible);
-      document.removeEventListener('visibilitychange', onReturn);
-      window.removeEventListener('focus', onReturn); window.removeEventListener('pageshow', onReturn); window.removeEventListener('online', onOnline);
-    };
-  }, [initial]);
+  // The server connection and the Accra-midnight schedule (seasonSync.ts): one request at a time, refreshed only when
+  // the answer could have changed; the phase itself is worked out on this device from the corrected clock.
+  useEffect(() => startSeasonSync({
+    fetchStatus: (fresh, signal) => fetch(`${API_BASE_URL}/api/seasonal/status`, { headers: { Accept: 'application/json' }, signal, ...(fresh ? { cache: 'no-cache' as RequestCache } : {}) })
+      .then(res => (res.ok ? res.json() : null)),
+    now: () => Date.now(),
+    random: Math.random,
+    isHidden: () => document.visibilityState === 'hidden',
+    listen: ({ onReturn, onOnline }) => {
+      document.addEventListener('visibilitychange', onReturn);
+      window.addEventListener('focus', onReturn); window.addEventListener('pageshow', onReturn); window.addEventListener('online', onOnline);
+      return () => {
+        document.removeEventListener('visibilitychange', onReturn);
+        window.removeEventListener('focus', onReturn); window.removeEventListener('pageshow', onReturn); window.removeEventListener('online', onOnline);
+      };
+    },
+    initial,
+    onAnswer: (data) => {
+      // The server is the only authority on which pack is on; the page recomputes the phase from today's Accra date.
+      skew.current = data.skew;
+      writeStorage(() => localStorage, CACHE_KEY, { pack: data.pack, at: data.at, skew: data.skew });
+      setScheduled(data.pack);
+      setGreetings(greetingsEntry(data.greetings));
+    },
+    onDay: (corrected) => setToday(accraDate(new Date(corrected))),
+    // Offline or blocked for longer than the last answer may stand: the ordinary appearance until the server answers.
+    onStale: () => setScheduled(null),
+  }), [initial]);
 
   const exitPreview = useCallback(() => { writeStorage(() => sessionStorage, PREVIEW_KEY, null); setPreview(null); }, []);
 

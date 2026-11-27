@@ -73,10 +73,10 @@
 .mh-ds[data-ds-season="christmas"] .mh-dsx-gift { transform-origin: 50% 100%; }
 .mh-ds[data-ds-season="christmas"] .mh-dsx-bauble { transform-origin: 50% 0; }
 .mh-ds[data-ds-season="christmas"] .mh-dsx-halo { transform-origin: 50% 50%; }
-.mh-ds[data-ds-season="christmas"] .mh-dsx-spark { transform-origin: 50% 50%; animation: mh-dsx-twinkle 2.2s calc(var(--i) * .2s) ease-in-out 2; } /* 3.6.4: two glints, then lit */
-.mh-ds[data-ds-season="christmas"] .mh-dsx-bulb { animation: mh-dsx-twinkle 2.2s calc(var(--i) * .12s) ease-in-out 2; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-spark { transform-origin: 50% 50%; animation: mh-dsx-twinkle 2.2s calc(var(--i) * .1s) ease-in-out 2; } /* 3.6.4: two glints, then lit */
+.mh-ds[data-ds-season="christmas"] .mh-dsx-bulb { animation: mh-dsx-twinkle 2.2s calc(var(--i) * .04s) ease-in-out 2; }
 /* The signal on the screen lights from the centre outward, like a connection being made (then rests lit). */
-.mh-ds[data-ds-season="christmas"] .mh-dsx-signal path { animation: mh-dsx-signal 2.4s calc(var(--i) * -.35s + 1s) ease-in-out 2; }
+.mh-ds[data-ds-season="christmas"] .mh-dsx-signal path { animation: mh-dsx-signal 2.2s calc(var(--i) * -.35s + .4s) ease-in-out 2; }
 .mh-ds[data-ds-season="christmas"] .mh-dsx-beam { animation: mh-dsx-glow 2.4s ease-in-out 2; }
 /* Entrance, once per visit (the title panel carries data-ds-seen when the page is opened again). */
 .mh-ds[data-ds-season="christmas"] .mh-ds-hero:not([data-ds-seen]) .mh-dsx-gift { animation: mh-dsx-arrive .9s .15s cubic-bezier(.34, 1.4, .5, 1) both; }

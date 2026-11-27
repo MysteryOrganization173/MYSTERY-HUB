@@ -5,7 +5,7 @@ import type { MarketplaceProduct, NetworkId } from '../../../types';
 import { GREETINGS_COMING_SOON, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { formatGhs } from '../../../../shared/money';
 import { BUSINESS_CONFIG } from '../../../config/business';
-import { openNetworksLabel, useServiceStatus } from '../../../hooks/useServiceStatus';
+import { airtimeCardLine, openNetworksLabel, pausedLabel, useServiceStatus } from '../../../hooks/useServiceStatus';
 import { memberOrderLabel, memberOrderNext, memberOrderSelection, memberOrderSteps, memberOrderTone, memberReorder } from '../../../utils/memberHomePresentation';
 import { NETWORKS, buyAgainButton, orderTitle, websiteCard, type MemberHomeViewProps } from '../../../components/home/MemberHomeView';
 import { ProductPhoto } from '../../../components/marketplace/MarketplaceMedia';
@@ -128,7 +128,8 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
   const christmas = isChristmasTime(status);
   const { big, small } = seasonCountdown(status);
   // 3.6.4: the Buy Data tile names only the networks selling now (Service Control Center).
-  const dataNetworks = openNetworksLabel('data', useServiceStatus());
+  const serviceStatus = useServiceStatus();
+  const dataNetworks = openNetworksLabel('data', serviceStatus);
   const { latest, recent, prioritizesActive } = memberOrderSelection(orders);
   const tone = !loading && !error && latest ? memberOrderTone(latest) : null;
   // A purchase that needs the customer, or is still moving, comes before new buying (exactly as the ordinary view).
@@ -176,12 +177,12 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
               <button className="xm-buy-tile is-data" onClick={() => actions.data()} onPointerDown={press} onAnimationEnd={pressEnd}>
                 <span className="xm-buy-sheen" aria-hidden="true" />
                 <span className="xm-buy-icon"><Wifi className="size-5" aria-hidden="true" /></span>
-                <span className="xm-buy-text"><strong>Buy Data</strong><span>{dataNetworks ?? 'Paused for maintenance'}</span></span>
+                <span className="xm-buy-text"><strong>Buy Data</strong><span>{dataNetworks ?? pausedLabel('data', serviceStatus)}</span></span>
                 <ArrowRight className="xm-buy-arrow size-5" aria-hidden="true" />
               </button>
               <button className="xm-buy-tile is-airtime" onClick={() => actions.airtime()} onPointerDown={press} onAnimationEnd={pressEnd}>
                 <span className="xm-buy-icon"><Smartphone className="size-5" aria-hidden="true" /></span>
-                <span className="xm-buy-text"><strong>Airtime</strong><span>Top up any Ghana number</span></span>
+                <span className="xm-buy-text"><strong>Airtime</strong><span>{airtimeCardLine(serviceStatus)}</span></span>
                 <ArrowRight className="xm-buy-arrow size-5" aria-hidden="true" />
               </button>
             </section>
