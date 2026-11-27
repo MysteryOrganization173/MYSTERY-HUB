@@ -66,6 +66,11 @@ export function AdminCommercialSection({token}:{token:string}) {
   {p.acquisitionContributionMinor!==null&&p.acquisitionContributionMinor<0&&<p role="alert" className="text-amber-300">Promotion plus first referral has negative contribution: an intentional acquisition subsidy, not a blocked reward.</p>}
   <label className="block">Future direct retail (GH₵)<input key={p.retailMinor} name="retail" className={field} defaultValue={(p.retailMinor/100).toFixed(2)}/></label><label className="block">Recommended reseller retail (optional, GH₵)<input key={String(p.recommendedMinor)} name="recommended" className={field} defaultValue={p.recommendedMinor===null?'':(p.recommendedMinor/100).toFixed(2)}/></label><label className="flex gap-2"><input key={String(p.enabled)} name="enabled" type="checkbox" defaultChecked={p.enabled}/>Direct product available</label><button disabled={busy} className={button}>Save future price</button>
  </form>)}</div>
+ {!!data.airteltigoCandidates?.length&&<details className="rounded-xl border border-slate-700 p-4">
+  <summary className="font-bold">AirtelTigo iShare proposals</summary>
+  <p className="mt-2 text-sm text-slate-400">Off sale pending supplier verification and pricing approval.</p>
+  <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">{data.airteltigoCandidates.map((p:{id:string;dataAmount:string;proposedRetailMinor:number})=><div key={p.id}><dt className="text-slate-400">{p.dataAmount}</dt><dd>{cash(p.proposedRetailMinor)}</dd></div>)}</dl>
+ </details>}
  <AdminResellerControls token={token}/><h3 className="font-bold">Recent pricing and offer changes</h3>{data.audit.map((a:any)=><details key={a.id} className="text-sm break-words"><summary>{a.created_at} · {a.action} · Admin {a.admin_user_id} · {a.entity_id}</summary>{auditChanges(a).map((line:string,i:number)=><p key={i}>{line}</p>)}</details>)}
  </>:null}</section>;
 }

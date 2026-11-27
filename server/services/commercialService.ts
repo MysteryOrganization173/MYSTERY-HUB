@@ -1,3 +1,4 @@
+import { AIRTELTIGO_ISHARE_CANDIDATES } from '../../shared/directPricing.js';
 import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
 import { isDirectDataCheckout } from './paymentScope.js';
 import { getPool } from '../db/connection.js';
@@ -268,7 +269,7 @@ export class CommercialService {
   static async admin() {
     const [prices,offer,store,economy,campaign,savedCampaign]=await Promise.all([config('direct-pricing'),config('welcome-offer'),WebsiteConfig(),economicsPolicy('data'),campaignConfig(),FinanceStore.readConfig('direct-campaign')]);
     const now=CommercialService.now();
-    const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).map(async p=>{
+    const products=await Promise.all(Object.values(AUTHORITATIVE_PRODUCTS).filter(p=>p.isActive).map(async p=>{
       const resolved=await FulfilmentService.getProvider().resolvePackage(p.network,p.dataAmount).catch(()=>null),supplierCostMinor=resolved?.resolved?.supplierCostMinor??null;
       const setting=prices.products[p.id],retailMinor=setting?.retailMinor??p.amountPesewas,reserveMinor=prices.reserveConfigured?percentMinor(retailMinor,prices.reserveBps)+prices.reserveFixedMinor:null,discountedMinor=retailMinor-offer.discountMinor;
       const firstRule=await ReferralStore.findMatchingRule('data',p.network,p.id,'acquisition');
@@ -298,7 +299,7 @@ export class CommercialService {
     return {prices,offer,campaign:{...campaign,state:campaignState(campaign,now),today:accraDate(now),endsAt:campaignEndsAt(campaign),
       // A saved campaign is authoritative; the shipped draft applies only when nothing was ever saved. A deploy never migrates it.
       source:savedCampaign?'saved':'shipped-default',approvedPlan:DECEMBER_2026_APPROVED_PLAN,planDifferences:campaignPlanDifferences(campaign),
-      valueWarnings:campaignValueWarnings(ladder)},afa:await CommercialService.afaAdmin(prices),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      valueWarnings:campaignValueWarnings(ladder)},afa:await CommercialService.afaAdmin(prices),products,airteltigoCandidates:AIRTELTIGO_ISHARE_CANDIDATES.filter(p=>!AUTHORITATIVE_PRODUCTS[p.id].isActive),dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');
@@ -325,7 +326,7 @@ export class CommercialService {
       const result={...next,...(id==='direct-pricing'?{products:{...previous.products,...next.products},reserveBps:input.configureReserve===true?next.reserveBps:stored?.reserveBps??0,reserveFixedMinor:input.configureReserve===true?next.reserveFixedMinor:stored?.reserveFixedMinor??0,reserveConfigured:input.configureReserve===true||Boolean(stored?.reserveConfigured)}:{}),version:randomUUID(),updatedAt:new Date().toISOString(),actorId:adminId};
       const prices=id==='direct-pricing'?result:await config('direct-pricing',tx),offer=id==='welcome-offer'?result:await config('welcome-offer',tx),campaign=id==='direct-campaign'?normalizeCampaign(result):await campaignConfig(tx);
       if(offer.enabled&&offer.services.includes('data')&&Object.values(AUTHORITATIVE_PRODUCTS).some(p=>{
-        if(!(prices.products[p.id]?.enabled??p.isActive))return false;
+        if(!p.isActive||prices.products[p.id]?.enabled===false)return false;
         // A configured campaign price is checked as well (whatever its dates), so the welcome benefit can never empty a payment.
         const standard=prices.products[p.id]?.retailMinor??p.amountPesewas,dated=campaign.stacksWithWelcome?campaign.products[p.id]?.campaignMinor:undefined;
         return Math.min(standard,dated??standard)<=offer.discountMinor;
@@ -363,7 +364,7 @@ async function campaignInput(input:any) {
   const products:Record<string,{campaignMinor:number}>={};
   for(const item of input.products) {
     const p=item&&typeof item.productId==='string'&&Object.hasOwn(AUTHORITATIVE_PRODUCTS,item.productId)?AUTHORITATIVE_PRODUCTS[item.productId]:undefined;
-    if(!p||products[p.id])throw new FinanceError('Choose each standard Data product once.');
+    if(!p?.isActive||products[p.id])throw new FinanceError('Choose each available standard Data product once.');
     products[p.id]={campaignMinor:moneyMinor(item.campaignMinor)};
   }
   if(input.enabled) {
