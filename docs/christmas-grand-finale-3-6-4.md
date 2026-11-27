@@ -145,7 +145,7 @@ It still only reads.
 |---|---|
 | Type-check, production build | Clean |
 | New suite `christmasGrandFinale364.test.ts`, including a behavioural scheduler test on mock timers (midnight, slow phone, small skew, foreground/reconnect/backoff, offline) | 16/16 |
-| Full suite (after merging the concurrent PR #150) | 3,651 pass, 0 fail (62 opt-in database tests skipped) |
+| Full suite (after merging the concurrent PRs #150 and #151) | 3,667 pass, 0 fail (62 opt-in database tests skipped) |
 | Browser lifecycle, controlled clock (guest and member boundaries, open checkout across midnight, background, wrong clock, offline and reconnect, Greetings open and close, 6 January restoration, malformed previews) | 31/31 |
 | Customer journeys 1–10 plus phase days, widths 320/360/390/430/768/1280/1440 (guest and member, 8 pages each), failed seasonal chunk, blocked storage | 170/170 |
 | Performance, accessibility and motion (lab bytes, slow-phone lab LCP/CLS, axe on 14 seasonal pages, reduced motion, settled motion, measured animation end times at 1440 and 390 for guest and member, Pixel 7 and iPhone 13 emulation) | 61/61 |
