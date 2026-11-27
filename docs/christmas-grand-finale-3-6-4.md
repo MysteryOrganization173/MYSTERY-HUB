@@ -1,6 +1,6 @@
 # Mystery Hub 3.6.4 · Christmas Grand Finale
 
-**Status:** code release. It integrates and hardens the existing seasonal presentation; it does not switch it on.
+**Status:** code release, merged in PR #152 (`3c80d16`), deployed and verified live (read-only) on 27 November 2026; see section 10. It integrates and hardens the existing seasonal presentation; it does not switch it on.
 
 **What this release does not do:**
 - It doesn't switch on Christmas, Mystery Greetings or the December campaign.
@@ -237,11 +237,11 @@ Left as they are, by design or as pre-existing:
 
 ### A. Before activation (as of this release)
 
-- **Deployed commit:** see the PR merge. Before the merge, production served `index-BLz_va7i.js` from `6f0c671`.
+- **Deployed commit:** `3c80d16` (PR #152), served as `index-0HDt-EWd.js`. Just before it, production served `index-e3H60Cv0.js` from `ff08452` (PR #151).
 - **Ordinary website:** live.
 - **Seasonal status:** off.
   - Before this release the status could not say whether the setting is present.
-  - After deploy, Admin → System → Seasonal experience shows "Set · starts on its own on 1 December 2026" if it is, or "Off (setting not present)" if not.
+  - Read live after deploy (27 November, 18:47 UTC): `scheduledPack: null`, so `SEASONAL_EXPERIENCE` is **not set** on the API service. Admin → System → Seasonal experience shows "Off (setting not present)". Once it is set, Admin shows "Set · starts on its own on 1 December 2026".
 - **Services** (read-only, 27 November):
   - MTN Data is in maintenance from the shipped default, with nothing saved in the Service Control Center.
   - The MTN Data announcement is live.
@@ -317,3 +317,50 @@ On a budget Android phone (Chrome), the installed PWA, an iPhone (Safari) if ava
 - **Orders:** open an existing receipt.
 - **Exit preview:** the ordinary site returns.
 - **Feel:** scrolling and taps are smooth; nothing keeps flashing after a few seconds; no notice covers the bottom navigation or a payment screen.
+
+## 10. Release record
+
+**Release:**
+- **PR:** #152, from `claude/elegant-lamport-q2binq`.
+- **Reviewed head:** `1b7a7dce0a6e75c08486efa80e031aebf305f0d1`. It includes the concurrent PRs #150 and #151, merged in with no files in common. The tests, build and browser checks were rerun after each.
+- **Merge:** `3c80d168ab7bcffb892d5ef82456822e0fc73cf9` (a merge commit). Its tree is identical to the reviewed head's.
+
+**CI ("Database security", `backend-rls`):**
+- passed on the PR head;
+- passed on `main` after the merge.
+
+**Deployment:**
+- The site moved from `index-e3H60Cv0.js` to `index-0HDt-EWd.js`, the same hash a local build of the reviewed tree produces.
+- `/api/seasonal/status` now returns `scheduledPack` and `serverTime`.
+
+**Live verification** (read-only, 27 November 2026, ~18:47 UTC): 31/31. An anonymous browser ran with every non-GET request blocked, so there was no sign-in, purchase, payment or analytics write.
+- **Seasonal status:**
+  - `active: false`, `scheduledPack: null` (the setting is not present);
+  - the server time is correct;
+  - Greetings is closed (`createPath: null`).
+- **Service status:** unchanged; MTN Data is in maintenance, and its announcement is shown.
+- **Ordinary homepage at 390 and 1440 px:**
+  - serves the new build;
+  - no Christmas code and no `data-season`;
+  - the Data card reads "Telecel & AirtelTigo" (on phones the layout hides that line, as before), and "MTN, Telecel & AirtelTigo" appears nowhere;
+  - no page errors, no horizontal overflow and no payment requests.
+- **`/data`, `/services`, `/help`, `/orders`:**
+  - render with no errors and no Christmas code;
+  - Help lists "What does it mean when a service is paused?".
+- **Founder preview in production (client-side only):**
+  - loads the Christmas pack and homepage;
+  - cleans the address;
+  - raises no errors;
+  - decorative motion has stopped after about 9 s;
+  - a fresh visitor afterwards sees the ordinary site.
+
+**Where each part stands:**
+
+| State | What |
+|---|---|
+| Implemented, reviewed, merged, deployed | Everything in sections 2–4. |
+| Verified live | The status contract, the season still off, ordinary pages, availability copy, the Help answer, and the founder preview loading and settling in production. |
+| Verified locally with synthetic fixtures only | Calendar boundaries and midnight changes, wrong clocks, offline and reconnect, member pages, serious checkout and receipt states, overlays, the Admin panel, and the full journeys and accessibility sweep (section 5). None of these can be exercised live without activation or a real account, so they are not claimed as live. |
+| Awaiting production configuration | `SEASONAL_EXPERIENCE=christmas-2026` on the API service (founder). Greetings (3.5). |
+| Awaiting physical-device acceptance | Section 9F: Android Chrome, the installed PWA, iPhone Safari and the WhatsApp in-app browser. WebKit and Firefox were not run. |
+| Deferred / out of scope | The standalone Countdown, Data Drop, new giveaways, and field Core Web Vitals (no production field data available). |
