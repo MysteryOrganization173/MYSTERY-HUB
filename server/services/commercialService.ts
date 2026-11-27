@@ -1,4 +1,3 @@
-import { AIRTELTIGO_ISHARE_CANDIDATES } from '../../shared/directPricing.js';
 import { PAYMENT_UNAVAILABLE } from '../../shared/paymentAvailability.js';
 import { isDirectDataCheckout } from './paymentScope.js';
 import { getPool } from '../db/connection.js';
@@ -299,7 +298,7 @@ export class CommercialService {
     return {prices,offer,campaign:{...campaign,state:campaignState(campaign,now),today:accraDate(now),endsAt:campaignEndsAt(campaign),
       // A saved campaign is authoritative; the shipped draft applies only when nothing was ever saved. A deploy never migrates it.
       source:savedCampaign?'saved':'shipped-default',approvedPlan:DECEMBER_2026_APPROVED_PLAN,planDifferences:campaignPlanDifferences(campaign),
-      valueWarnings:campaignValueWarnings(ladder)},afa:await CommercialService.afaAdmin(prices),products,airteltigoCandidates:AIRTELTIGO_ISHARE_CANDIDATES.filter(p=>!AUTHORITATIVE_PRODUCTS[p.id].isActive),dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
+      valueWarnings:campaignValueWarnings(ladder)},afa:await CommercialService.afaAdmin(prices),products,dataReferralPolicy:economy,audit:(await AdminAuditStore.findRecent(100)).filter(a=>a.action.startsWith('commercial_')||a.action==='store_wholesale_changed'||a.action==='store_policy_changed').slice(0,25)};
   }
   static async save(adminId:string,input:any) {
     if(input.confirmed!==true)throw new FinanceError('Confirm this commercial change.');

@@ -4,6 +4,7 @@
  * Enforces strict network mapping and exact package size matching without approximation.
  */
 
+import { AIRTELTIGO_ISHARE_ADDITIONS } from '../../../shared/directPricing.js';
 import { SbhOffer, SbhPackage } from './types.js';
 import { parseMinorAmount } from './money.js';
 
@@ -62,6 +63,11 @@ export function normalizeSizeLabel(label: string): string {
   return label.replace(/\s+/g, '').toUpperCase();
 }
 
+export function usesQualifiedIShareOffer(network: string, size: string): boolean {
+  return normalizeNetwork(network) === 'airteltigo' &&
+    AIRTELTIGO_ISHARE_ADDITIONS.some(plan => plan.dataAmount === normalizeSizeLabel(size));
+}
+
 /**
  * Resolves a live supplier offer and exact package for a Mystery Hub product
  *
@@ -86,13 +92,18 @@ export function resolveSupplierPackage(
   }
 
   // 1. Filter for kind === 'data' and matching network
+  const qualifiedIShare = usesQualifiedIShareOffer(mysteryHubNetwork, mysteryHubBundleSize);
   const matchingDataOffers = catalogOffers.filter((offer) => {
     const isData = (offer.kind || '').toLowerCase().trim() === 'data';
     const matchesNet = isNetworkMatch(offer.network || offer.name, targetNetwork);
     const isEnabled = offer.enabled !== false;
-    return isData && matchesNet && isEnabled;
+    return isData && matchesNet && isEnabled && offer.available !== false &&
+      (!qualifiedIShare || offer.slug === 'ishare_data_bundle');
   });
 
+  if (qualifiedIShare && matchingDataOffers.length > 1) {
+    return { resolved: null, error: 'Multiple active rows use the qualified iShare offer selector.' };
+  }
   if (matchingDataOffers.length === 0) {
     return {
       resolved: null,
@@ -160,9 +171,11 @@ export function resolveSupplierPackage(
   const targetSizeNormalized = normalizeSizeLabel(mysteryHubBundleSize);
   const packages = Array.isArray(selectedOffer.packages) ? selectedOffer.packages : [];
 
-  const matchedPackage = packages.find((pkg) => {
-    return normalizeSizeLabel(pkg.sizeLabel) === targetSizeNormalized;
-  });
+  const matchingPackages = packages.filter(pkg => normalizeSizeLabel(pkg.sizeLabel) === targetSizeNormalized);
+  if (qualifiedIShare && matchingPackages.length > 1) {
+    return { resolved: null, error: 'The qualified iShare offer has conflicting rows for this exact size.' };
+  }
+  const matchedPackage = matchingPackages.find(pkg => pkg.enabled !== false && pkg.available !== false);
 
   if (!matchedPackage) {
     const availableSizes = packages.map((p) => p.sizeLabel).join(', ');

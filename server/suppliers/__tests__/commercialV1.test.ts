@@ -17,7 +17,7 @@ import {STANDARD_DATA_REFERRAL_POLICY} from '../../config/dataReferralRewardPoli
 import {AdminAuditStore} from '../../db/adminAuditStore.js';
 import {PaystackServerService as P} from '../../services/paystackService.js';
 import {FulfilmentService as F} from '../../services/fulfilmentService.js';
-import {AIRTELTIGO_ISHARE_CANDIDATES,DIRECT_RETAIL_MINOR} from '../../../shared/directPricing.js';
+import {AIRTELTIGO_ISHARE_ADDITIONS,DIRECT_RETAIL_MINOR} from '../../../shared/directPricing.js';
 import {DATA_BUNDLES} from '../../../src/data/bundles.js';
 import {canonicalGhanaPhone} from '../../utils/phone.js';
 import {apiRouter,handlePaystackWebhook} from '../../routes/api.js';
@@ -27,7 +27,6 @@ import {computeEconomicReward,saveEconomicsPolicy,economicsPolicy} from '../../s
 import {DATA_MARGIN_POLICY} from '../../../shared/dataReferralPolicy.js';
 import {toSafePublicOrder} from '../../types/orders.js';
 import {COMMERCIAL_SCHEMA} from '../../db/commercialSchema.js';
-import {AUTHORITATIVE_PRODUCTS} from '../../data/productCatalog.js';
 import {resolveReorder} from '../../services/reorderService.js';
 
 const originalFetch=globalThis.fetch,init=P.initializeTransaction,verify=P.verifyTransaction,dispatch=F.processPaidOrder,preflight=F.preflightCheck,provider=F.getProvider(),resolve=provider.resolvePackage;
@@ -77,7 +76,7 @@ test('direct gateway timeout retains the created reference and blocks another in
  for(let i=0;i<2;i++){const response=await request('payments/initialize',body,''),data=await response.json();assert.equal(data.checkout.paymentState,'unconfirmed');assert.match(data.existingOrderReference,/^MH-/);assert.equal(JSON.stringify(data).includes('PRIVATE'),false);}
  assert.equal(count,1);assert.equal(OrdersStore.adminDevOrders().length,1);
 });
-for(const [id,price] of Object.entries(DIRECT_RETAIL_MINOR))test('approved launch catalog and frontend seed '+id,async()=>{assert.equal((await C.catalog()).products.find(p=>p.id===id)?.amountPesewas,price);assert.equal(DATA_BUNDLES.find(p=>p.id===id)?.priceGhc,price/100);});
+for(const [id,price] of Object.entries(DIRECT_RETAIL_MINOR))test('approved launch catalog and frontend seed '+id,async()=>{assert.equal((await C.catalog()).products.find(p=>p.id===id)?.amountPesewas,price);assert.equal(DATA_BUNDLES.find(p=>p.id===id)?.priceGhc,AIRTELTIGO_ISHARE_ADDITIONS.some(p=>p.id===id)?undefined:price/100);});
 for(const phone of ['0241234567','233241234567','+233241234567','(024) 123-4567'])test('canonical identity '+phone,()=>assert.equal(canonicalGhanaPhone(phone),'+233241234567'));
 test('older unused buyer gets exact 100 discount and 449 total independent of recipient',async()=>{const q=await C.quote('mtn-1gb','buyer');assert.equal(q.discountMinor,100);assert.equal(q.totalMinor,449);const result=await initialize();assert.equal(result.amount,449);assert.equal(parameters.amountPesewas,449);assert.notEqual(result.recipient_phone,result.commercial_context!.buyerPhone);assert.equal((await C.quote('mtn-1gb','other')).discountMinor,100);});
 test('guest receives regular retail and no buyer identity',async()=>{const q=await C.quote('mtn-1gb');assert.equal(q.discountMinor,0);assert.equal(q.totalMinor,549);const result=await C.initialize(order({user_id:null}),input());assert.equal(result.amount,549);assert.equal(result.commercial_context!.promotionId,null);});
@@ -354,37 +353,27 @@ test('dynamic absent configuration never seeds policy and Admin fields describe 
  const ui=readFileSync('src/components/admin/sections/AdminFinanceSection.tsx','utf8');assert.ok(ui.includes('First qualifying reward (%)'));assert.ok(ui.includes('Recurring reward (%)'));assert.ok(ui.includes('reserveConfigured'));
 });
 
-test('pending iShare candidates are Admin-visible proposals only and refuse quote, payment and campaign attempts',async t=>{
- const preflight=t.mock.method(F,'preflightCheck',async()=>assert.fail('candidate reached supplier'));
- const initializePayment=t.mock.method(P,'initializeTransaction',async()=>assert.fail('candidate reached Paystack'));
- const proposals=AIRTELTIGO_ISHARE_CANDIDATES;
+test('all approved iShare products use authoritative prices in Admin and direct quotes',async ()=>{
  const catalogue=await C.catalog();
- assert.equal(catalogue.products.filter(p=>p.network==='airteltigo').length,5);
+ assert.equal(catalogue.products.filter(p=>p.network==='airteltigo').length,18);
  const admin=await (await request('admin/commercial',undefined,'admin-token')).json();
- assert.deepEqual(admin.airteltigoCandidates,proposals);
- assert.ok(proposals.every(p=>!admin.products.some((active:any)=>active.id===p.id)));
- for(const p of proposals){
-  assert.equal((await request('commercial/quote/'+p.id)).status,404);
-  const denied=await request('payments/initialize',input({productId:p.id,recipientPhone:'0271234567',expectedTotalMinor:p.proposedRetailMinor}),'');
-  assert.equal((await denied.json()).code,'PACKAGE_UNAVAILABLE');
-  const historic=paymentOrder({product_id:p.id,network:'airteltigo',status:'delivered',payment_status:'success',delivered_at:new Date().toISOString()});
-  assert.equal((await resolveReorder(historic)).available,false);
+ for(const p of AIRTELTIGO_ISHARE_ADDITIONS){
+  assert.equal(admin.products.find((row:{id:string})=>row.id===p.id)?.retailMinor,p.retailMinor);
+  const quote=await C.quote(p.id);
+  assert.equal(quote.totalMinor,p.retailMinor);
+  assert.equal(quote.product.validity,undefined);
+  assert.equal((await C.quote(p.id,'buyer')).totalMinor,p.retailMinor-100);
  }
- const change=(await request('admin/commercial',{kind:'pricing',confirmed:true,expectedVersion:'direct-launch-v1',reserveBps:0,reserveFixedMinor:0,products:[{productId:'at-6gb',retailMinor:2749,recommendedMinor:null,enabled:true}]},'admin-token'));
- assert.equal(change.status,400);
- const campaign=(await request('admin/commercial',{kind:'campaign',confirmed:true,enabled:false,startDate:null,endDate:null,products:[{productId:'at-6gb',campaignMinor:2700}]},'admin-token'));
- assert.equal(campaign.status,400);
- assert.equal(preflight.mock.callCount(),0);
- assert.equal(initializePayment.mock.callCount(),0);
+ assert.equal((await request('commercial/quote/at-11gb')).status,404);
+ const denied=await request('payments/initialize',input({productId:'at-11gb',recipientPhone:'0271234567'}),'');
+ assert.equal((await denied.json()).code,'PACKAGE_UNAVAILABLE');
  assert.equal(OrdersStore.adminDevOrders().length,0);
 });
 
-test('isolated qualified 6GB fixture follows current quote, funding, payment and historical order paths',async t=>{
- const plan=AUTHORITATIVE_PRODUCTS['at-6gb'];
+test('approved 6GB follows current Paystack, campaign, supplier and historical order paths',async t=>{
  const oldNow=C.now;
- plan.isActive=true;
  C.now=()=>new Date('2026-12-20T12:00:00Z');
- t.after(()=>{plan.isActive=false;C.now=oldNow;});
+ t.after(()=>{C.now=oldNow;});
  await FinanceStore.transaction('admin',tx=>tx.saveConfig('direct-campaign',{enabled:true}));
  assert.equal((await C.catalog()).products.find(p=>p.id==='at-6gb')?.campaign,undefined);
  const quote=await C.quote('at-6gb');
@@ -395,7 +384,7 @@ test('isolated qualified 6GB fixture follows current quote, funding, payment and
   const denied=await request('payments/initialize',fields,'');
   assert.equal((await denied.json()).code,code);
  }
- F.preflightCheck=async(network,size)=>{assert.equal(network,'airteltigo');assert.equal(size,'6GB');return {allowed:true,supplierCostMinor:2200,supplierOfferRef:'fixture-ishare'};};
+ F.preflightCheck=async(network,size)=>{assert.equal(network,'airteltigo');assert.equal(size,'6GB');return {allowed:true,supplierCostMinor:2340,supplierOfferRef:'ishare_data_bundle'};};
  const stale=await request('payments/initialize',{...fields,expectedTotalMinor:2748},'');
  assert.equal(stale.status,409);
  assert.equal(OrdersStore.adminDevOrders().length,0);
@@ -406,11 +395,32 @@ test('isolated qualified 6GB fixture follows current quote, funding, payment and
  assert.match(started.reference,/^MH_PAY_AIRTELTIGO_/);
  assert.equal(stored.bundle_size_snapshot,'6GB');
  assert.equal(stored.supplier_provider,'success_biz_hub');
- assert.equal(stored.supplier_offer_ref,'fixture-ishare');
+ assert.equal(stored.supplier_offer_ref,'ishare_data_bundle');
  const paid={isVerified:true,status:'success' as const,reference:stored.payment_reference,amountPesewas:2749,currency:'GHS'};
  assert.equal(validateOrderPayment(stored,paid),null);
  assert.equal(validateOrderPayment(stored,{...paid,amountPesewas:2748}),'payment_amount_mismatch');
  const historic={...stored,status:'delivered' as const,payment_status:'success' as const,delivered_at:new Date().toISOString()};
  assert.equal((await resolveReorder(historic)).available,true);
  assert.equal(toSafePublicOrder(historic).bundle_size_snapshot,'6GB');
+});
+
+test('100GB Wallet checkout preserves funding, price drift and debit guards',async ()=>{
+ await FinanceService.adjustment('admin','buyer',{confirmed:true,direction:'credit',amountMinor:50000,requestId:randomUUID(),reason:'Fixture'});
+ P.initializeTransaction=async()=>assert.fail('Wallet checkout cannot initialize Paystack');
+ const fields=input({productId:'at-100gb',recipientPhone:'0271234567',expectedTotalMinor:44949,paymentMethod:'wallet'});
+ F.preflightCheck=async()=>({allowed:false,code:'SUPPLIER_WALLET_LOW'});
+ assert.equal((await (await request('payments/initialize',fields)).json()).code,'SUPPLIER_WALLET_LOW');
+ F.preflightCheck=async()=>({allowed:true,supplierCostMinor:45050,supplierOfferRef:'ishare_data_bundle'});
+ assert.equal((await request('payments/initialize',fields)).status,409);
+ assert.equal((await FinanceService.summary('buyer')).walletMinor,50000);
+ assert.equal(OrdersStore.adminDevOrders().length,0);
+ F.preflightCheck=async()=>({allowed:true,supplierCostMinor:39000,supplierOfferRef:'ishare_data_bundle'});
+ const response=await request('payments/initialize',fields);
+ assert.equal(response.status,200);
+ const result=await response.json();
+ assert.equal(result.amountPesewas,44949);
+ assert.equal((await FinanceService.summary('buyer')).walletMinor,5051);
+ const stored=await OrdersStore.findOrder(result.orderRef);
+ assert.equal(stored?.bundle_size_snapshot,'100GB');
+ assert.equal(stored?.supplier_cost_minor,39000);
 });

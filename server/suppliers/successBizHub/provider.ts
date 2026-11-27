@@ -1,3 +1,4 @@
+import type { SbhServiceItem } from './types.js';
 /**
  * Success Biz Hub Supplier Provider
  * Production implementation of SupplierProvider abstraction for Data Bundles
@@ -91,8 +92,8 @@ export class SuccessBizHubProvider implements SupplierProvider {
    * 1. GET /wallet
    * Retrieves supplier wallet balance. Strictly validates availableMinor.
    */
-  async getBalance(): Promise<SupplierBalance> {
-    const res = await this.client.getWallet();
+  async getBalance(fresh = false): Promise<SupplierBalance> {
+    const res = await this.client.getWallet(fresh);
     const data = res.data || {};
     const parsedAvailable = parseMinorAmount(data.availableMinor);
     if (parsedAvailable === null) {
@@ -155,9 +156,17 @@ export class SuccessBizHubProvider implements SupplierProvider {
   /**
    * Check if data services are active and available in /services
    */
-  async checkServicesAvailable(): Promise<{ available: boolean; reason?: string }> {
+  async checkServicesAvailable(requireOrderEntitlement = false): Promise<{ available: boolean; reason?: string }> {
     try {
-      const res = await this.client.getServices();
+      const res = await this.client.getServices(requireOrderEntitlement);
+      if (requireOrderEntitlement) {
+        const data = res.data as { keyPermissions?: { orders?: boolean }; services?: SbhServiceItem[] };
+        const orders = Array.isArray(data?.services) ? data.services.filter(service => service?.id === 'orders') : [];
+        if (data?.keyPermissions?.orders !== true || orders.length !== 1 ||
+            orders[0].keyGranted !== true || orders[0].available !== true || orders[0].enabled === false) {
+          return { available: false, reason: 'Standard data entitlement or availability is not confirmed.' };
+        }
+      }
       const list = Array.isArray(res.data)
         ? res.data
         : (res.data as { services?: unknown[] })?.services || [];
