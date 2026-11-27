@@ -99,7 +99,10 @@ export class SuccessBizHubProvider implements SupplierProvider {
     if (parsedAvailable === null) {
       throw new Error(`Invalid or unparseable availableMinor in supplier wallet: "${String(data.availableMinor)}"`);
     }
-    const currency = (data.currency || 'GHS').toUpperCase() as 'GHS';
+    if (fresh && (typeof data.currency !== 'string' || data.currency.trim().toUpperCase() !== 'GHS')) {
+      throw new Error('Currency not confirmed for the current supplier wallet balance.');
+    }
+    const currency = fresh ? 'GHS' : (data.currency || 'GHS').toUpperCase() as 'GHS';
 
     return {
       providerName: this.providerName,

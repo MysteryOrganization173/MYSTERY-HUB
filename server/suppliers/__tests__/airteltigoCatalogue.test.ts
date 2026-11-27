@@ -4,6 +4,8 @@ import { AIRTELTIGO_ISHARE_ADDITIONS, DIRECT_RETAIL_MINOR } from '../../../share
 import { DATA_BUNDLES } from '../../../src/data/bundles.js';
 import { projectDirectCatalogBundle } from '../../../src/hooks/useDirectCatalog.js';
 import { readSbhDataCatalogue } from '../../../scripts/sbh-data-catalogue-readonly.js';
+import { OrdersStore } from '../../db/ordersStore.js';
+import { paymentOrder } from './paymentFixtures.js';
 import { FulfilmentService } from '../../services/fulfilmentService.js';
 import { AUTHORITATIVE_PRODUCTS, getAuthoritativeProduct } from '../../data/productCatalog.js';
 import { SuccessBizHubClient } from '../successBizHub/client.js';
@@ -44,6 +46,7 @@ test('the existing SBH resolver matches every candidate size exactly and uses fi
   assert.equal(resolveSupplierPackage([offer,{...offer,slug:'other'}],'airteltigo','6GB').resolved?.offerSlug,offer.slug);
   assert.equal(resolveSupplierPackage([{...offer,slug:'other'}],'airteltigo','6GB').resolved,null);
   assert.equal(resolveSupplierPackage([offer,offer],'airteltigo','6GB').resolved,null);
+  assert.equal(resolveSupplierPackage([offer,{...offer,enabled:false}],'airteltigo','6GB').resolved,null);
   assert.equal(resolveSupplierPackage([{...offer,available:false}],'airteltigo','6GB').resolved,null);
   for (const flag of ['available','enabled']) {
     assert.equal(resolveSupplierPackage([{...offer,packages:[{...offer.packages[0],[flag]:false}]}],'airteltigo','6GB').resolved,null);
@@ -62,8 +65,8 @@ test('the read-only operator probe checks scope then resolves exact packages and
   assert.equal(result.granted,true);
   const at=result.networks.find(row=>row.network==='airteltigo')!;
   assert.equal(at.packages.find(p=>p.size==='6GB')?.resolution,'missing_or_ambiguous');
-  assert.equal(at.packages.find(p=>p.size==='1GB')?.resolution,'missing_or_ambiguous');
-  assert.equal(at.packages.find(p=>p.size==='1GB')?.packageValidity,undefined);
+  assert.equal(at.packages.find(p=>p.size==='1GB')?.resolution,'requires_review');
+  assert.equal(at.packages.find(p=>p.size==='1GB')?.packageValidity,null);
   assert.equal(at.packages.find(p=>p.size==='100GB')?.packageValidity,null);
   assert.deepEqual(at.packages.find(p=>p.size==='100GB')?.reviewReasons,['validity_unconfirmed','availability_unconfirmed']);
   assert.ok(!JSON.stringify(result).includes('<private>'));
@@ -106,18 +109,21 @@ test('added large plans check current orders entitlement, exact price, recipient
   const provider=FulfilmentService.getProvider();
   const enabled=t.mock.method(provider.client,'isFulfillmentEnabled',()=>true);
   t.mock.method(provider.client,'isConfigured',()=>true);
-  let permission=true, available=true, balance=0, currency='GHS', eligible=true;
+  let permission=true, available=true, balance=0, currency:unknown='GHS', eligible=true;
   const services=t.mock.method(provider.client,'getServices',async (fresh?:boolean)=>{
     assert.equal(fresh,true);
     return {status:'success',data:{keyPermissions:{orders:permission},services:[{id:'orders',keyGranted:permission,available}]}};
   });
-  t.mock.method(provider.client,'getCatalog',async ()=>({status:'success',data:{offers:[{...offer,packages:[
-    {id:'fixture-50',sizeLabel:'50GB',priceMinor:19500},
-    {id:'fixture-100',sizeLabel:'100GB',priceMinor:39000},
-  ]}]}}));
+  t.mock.method(provider.client,'getCatalog',async (fresh?:boolean)=>{
+    assert.equal(fresh,true);
+    return {status:'success',data:{offers:[{...offer,packages:[
+      {id:'fixture-50',sizeLabel:'50GB',priceMinor:19500},
+      {id:'fixture-100',sizeLabel:'100GB',priceMinor:39000},
+    ]}]}};
+  });
   const wallet=t.mock.method(provider.client,'getWallet',async (fresh?:boolean)=>{
     assert.equal(fresh,true);
-    return {status:'success',data:{availableMinor:balance,currency}};
+    return {status:'success',data:{availableMinor:balance,currency:currency as string}};
   });
   const check=t.mock.method(provider,'checkBeneficiaryEligibility',async (_phone:string,selector?:{offerSlug?:string;offerId?:string})=>{
     assert.equal(selector?.offerSlug,offer.slug);
@@ -134,8 +140,10 @@ test('added large plans check current orders entitlement, exact price, recipient
     assert.equal(allowed.supplierCostMinor,cost);
     assert.equal(allowed.supplierOfferRef,offer.slug);
   }
-  currency='USD';
-  assert.equal((await preflight('100GB')).code,'SERVICE_TEMPORARILY_UNAVAILABLE');
+  for (const unknownCurrency of ['USD',undefined,99]) {
+    currency=unknownCurrency;
+    assert.equal((await preflight('100GB')).code,'SERVICE_TEMPORARILY_UNAVAILABLE');
+  }
   currency='GHS';
   eligible=false;
   assert.equal((await preflight('100GB')).code,'BENEFICIARY_NOT_ELIGIBLE');
@@ -144,11 +152,34 @@ test('added large plans check current orders entitlement, exact price, recipient
   permission=true;
   available=false;
   assert.equal((await preflight('100GB')).code,'SERVICE_TEMPORARILY_UNAVAILABLE');
-  assert.equal(services.mock.callCount(),8);
-  assert.equal(wallet.mock.callCount(),6);
-  assert.equal(check.mock.callCount(),6);
+  assert.equal(services.mock.callCount(),10);
+  assert.equal(wallet.mock.callCount(),8);
+  assert.equal(check.mock.callCount(),8);
   enabled.mock.mockImplementation(()=>false);
   assert.equal((await preflight('100GB')).code,'SERVICE_TEMPORARILY_UNAVAILABLE');
-  assert.equal(services.mock.callCount(),8);
+  assert.equal(services.mock.callCount(),10);
   assert.equal(dispatch.mock.callCount(),0);
+});
+
+test('paid added plan sees a new supplier cost and is held before dispatch',async t=>{
+  const provider=FulfilmentService.getProvider();
+  t.mock.method(provider.client,'isFulfillmentEnabled',()=>true);
+  t.mock.method(FulfilmentService,'isTestPaymentEnvironment',()=>false);
+  const catalogue=t.mock.method(provider.client,'getCatalog',async (fresh?:boolean)=>{
+    assert.equal(fresh,true);
+    return {status:'success',data:{offers:[{...offer,packages:[{id:'fixture-50',sizeLabel:'50GB',priceMinor:19600}]}]}};
+  });
+  const submit=t.mock.method(provider.client,'createOrder',async()=>assert.fail('changed supplier cost cannot dispatch'));
+  const order=paymentOrder({
+    network:'airteltigo',product_id:'at-50gb',bundle_size_snapshot:'50GB',amount:22549,
+    status:'queued',payment_status:'success',paid_at:new Date().toISOString(),
+    supplier_offer_ref:offer.slug,supplier_cost_minor:19500,
+  });
+  await OrdersStore.createOrder(order);
+  const result=await FulfilmentService.dispatchClaimedOrder(order);
+  assert.equal(result.order?.manual_review,true);
+  assert.equal(result.order?.payment_status,'success');
+  assert.equal(result.order?.supplier_cost_minor,19500);
+  assert.equal(catalogue.mock.callCount(),1);
+  assert.equal(submit.mock.callCount(),0);
 });

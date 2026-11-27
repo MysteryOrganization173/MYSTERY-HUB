@@ -2,7 +2,7 @@
 
 The November 27, 2026 authenticated production SBH diagnostic (13:07 UTC) confirmed permission to create data orders, standard Data service availability and one exact package for every requested AirtelTigo size under `ishare_data_bundle`. All 18 supplier costs matched the dealer catalogue. The founder approved the additional 13 prices after that comparison.
 
-The API did not report package or offer availability or validity for these plans. It likewise omits those fields for the five existing AirtelTigo sizes and the current Telecel sizes. Catalogue inclusion proves account-specific package mapping. Checkout requires current orders permission, service availability, exact offer and size, recipient eligibility, and enough available SBH wallet funds for the current cost. Explicitly unavailable or disabled offers and packages are rejected. This preflight does not reserve supplier funds. At dispatch, the existing checks retain the supplier, offer and cost snapshot.
+The API did not report package or offer availability or validity for these plans. It likewise omits those fields for the five existing AirtelTigo sizes and the current Telecel sizes. Catalogue inclusion proves account-specific package mapping. Checkout rechecks the current orders permission, service availability, exact offer and size, recipient eligibility, and sufficient available SBH wallet funds in GHS. At dispatch, a fresh catalogue read verifies the existing supplier, offer and cost snapshot. Explicitly unavailable or disabled offers and packages are rejected. This preflight does not reserve supplier funds.
 
 ## Approved prices
 
@@ -31,7 +31,7 @@ The table records costs observed on November 27. Checkout obtains the current co
 
 ## Economics and validity
 
-The production check on November 27 found no direct price overrides. The Welcome discount is GH₵1.00 for an eligible customer. Data economics uses a configured zero processing reserve, a 45% acquisition reward based on the regular margin, and a 20% recurring reward for eligible referrals. At Paystack’s published Ghana rate of 1.95%, the estimated Welcome-plus-acquisition contribution on 6 GB is GH₵0.73, rising to GH₵11.39 for 50 GB and GH₵22.50 for 100 GB. These are estimates using the observed costs and the published fee. The account’s actual fees may differ. [Paystack Ghana pricing](https://paystack.com/gh/pricing)
+The production check on November 27 found no direct price overrides. The Welcome discount is GH₵1.00 for an eligible customer. Data economics uses a configured zero processing reserve, a 45% acquisition reward based on the regular margin, and a 20% recurring reward for eligible referrals. At Paystack’s published Ghana rate of 1.95%, the estimated Welcome-plus-acquisition contribution on 6 GB is GH₵0.73, rising to GH₵11.39 for 50 GB and GH₵23.50 for 100 GB. These are estimates using the observed costs and the published fee. The account’s actual fees may differ. [Paystack Ghana pricing](https://paystack.com/gh/pricing)
 
 The 50 GB and 100 GB orders need at least GH₵195.00 and GH₵390.00 respectively in available SBH funds at the observed costs. The authenticated catalogue diagnostic did not measure wallet funds. Both Paystack and Wallet paths enforce the preflight before accepting a new payment.
 

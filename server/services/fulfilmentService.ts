@@ -139,7 +139,8 @@ export class FulfilmentService {
         })(),
         (async () => {
           const c0 = performance.now();
-          const res = await this.provider.resolvePackage(network, bundleSize);
+          const catalog = qualifiedIShare ? await this.provider.getRawCatalog(true) : undefined;
+          const res = await this.provider.resolvePackage(network, bundleSize, catalog);
           return { res, ms: Math.round(performance.now() - c0) };
         })(),
       ]);
@@ -659,10 +660,14 @@ export class FulfilmentService {
     let storeSupplierId:string|undefined;
     // 4-Data: Live dispatch to Success Biz Hub Data catalog
     try {
-      // 4a. Resolve live supplier package
+      // Revalidate the added iShare plans against fresh supplier terms before the existing snapshot checks.
+      const catalog = usesQualifiedIShareOffer(claimedOrder.network, claimedOrder.bundle_size_snapshot)
+        ? await provider.getRawCatalog(true)
+        : undefined;
       const resolution = await provider.resolvePackage(
         claimedOrder.network,
-        claimedOrder.bundle_size_snapshot
+        claimedOrder.bundle_size_snapshot,
+        catalog
       );
 
       if (!resolution.resolved) {

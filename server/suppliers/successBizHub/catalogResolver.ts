@@ -96,13 +96,14 @@ export function resolveSupplierPackage(
   const matchingDataOffers = catalogOffers.filter((offer) => {
     const isData = (offer.kind || '').toLowerCase().trim() === 'data';
     const matchesNet = isNetworkMatch(offer.network || offer.name, targetNetwork);
-    const isEnabled = offer.enabled !== false;
-    return isData && matchesNet && isEnabled && offer.available !== false &&
-      (!qualifiedIShare || offer.slug === 'ishare_data_bundle');
+    return isData && matchesNet && (qualifiedIShare ? offer.slug === 'ishare_data_bundle' : offer.enabled !== false);
   });
 
   if (qualifiedIShare && matchingDataOffers.length > 1) {
-    return { resolved: null, error: 'Multiple active rows use the qualified iShare offer selector.' };
+    return { resolved: null, error: 'Multiple rows use the qualified iShare offer selector.' };
+  }
+  if (qualifiedIShare && matchingDataOffers.some(offer => offer.enabled === false || offer.available === false)) {
+    return { resolved: null, error: 'The qualified iShare offer is unavailable.' };
   }
   if (matchingDataOffers.length === 0) {
     return {
@@ -175,7 +176,7 @@ export function resolveSupplierPackage(
   if (qualifiedIShare && matchingPackages.length > 1) {
     return { resolved: null, error: 'The qualified iShare offer has conflicting rows for this exact size.' };
   }
-  const matchedPackage = matchingPackages.find(pkg => pkg.enabled !== false && pkg.available !== false);
+  const matchedPackage = matchingPackages.find(pkg => !qualifiedIShare || (pkg.enabled !== false && pkg.available !== false));
 
   if (!matchedPackage) {
     const availableSizes = packages.map((p) => p.sizeLabel).join(', ');
