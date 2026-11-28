@@ -13,7 +13,7 @@ export const RouteLoadError: React.FC<{ reason?: 'download' | 'page' }> = ({ rea
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const page = reason === 'page' && !offline;
   return (
-    <div className="mh-route-fallback" role="alert">
+    <div className="mh-route-fallback is-error" role="alert">
       <div className="max-w-sm text-center px-4">
         {page ? <AlertTriangle className="size-6 mx-auto text-amber-300" aria-hidden="true" /> : <WifiOff className="size-6 mx-auto text-slate-400" aria-hidden="true" />}
         <h2 className="mt-3 text-lg font-semibold text-white">{offline ? 'You are offline' : page ? 'Something went wrong on this page' : 'This page did not load'}</h2>

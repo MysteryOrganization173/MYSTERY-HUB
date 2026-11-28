@@ -1,0 +1,1413 @@
+{
+ "before": {
+  "build": "main 33c6826",
+  "network": {
+   "offline": false,
+   "latency": 150,
+   "downloadThroughput": 200000,
+   "uploadThroughput": 93750
+  },
+  "cpuSlowdown": 4,
+  "runsPerPage": 5,
+  "pages": {
+   "home-guest": {
+    "median": {
+     "lcp": 2328,
+     "lcpRange": [
+      2252,
+      2448
+     ],
+     "fcp": 2328,
+     "heroMs": 2281.5999999998603,
+     "serifMs": null,
+     "cls": 0.01714927527718121,
+     "tbt": 0,
+     "mainThreadMs": 924,
+     "scriptMs": 364,
+     "totalKB": 332.818359375,
+     "requests": 61,
+     "jsKB": 246.6875,
+     "cssKB": 48.458984375,
+     "fontKB": 32.2333984375,
+     "apiCount": 9,
+     "blocked": 14,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+    "medianRun": {
+     "lcp": 2328,
+     "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+     "shifts": [
+      {
+       "t": 2385,
+       "value": 0.0168,
+       "moved": [
+        "div.home-hero-copy",
+        "section.home-container.home-everyday"
+       ]
+      },
+      {
+       "t": 2738,
+       "value": 0.0004,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "home-guest-season": {
+    "median": {
+     "lcp": 2400,
+     "lcpRange": [
+      2288,
+      2532
+     ],
+     "fcp": 2400,
+     "heroMs": 3547.8000000000466,
+     "serifMs": 4185.09999999986,
+     "cls": 0.08219330484490464,
+     "tbt": 206,
+     "mainThreadMs": 2487,
+     "scriptMs": 621,
+     "totalKB": 462.115234375,
+     "requests": 80,
+     "jsKB": 273.6123046875,
+     "cssKB": 68.7724609375,
+     "fontKB": 112.7822265625,
+     "apiCount": 13,
+     "blocked": 31,
+     "ordinaryFirst": 5,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+    "medianRun": {
+     "lcp": 2400,
+     "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+     "shifts": [
+      {
+       "t": 2460,
+       "value": 0.0147,
+       "moved": [
+        "div.home-hero-copy",
+        "section.home-container.home-everyday"
+       ]
+      },
+      {
+       "t": 2584,
+       "value": 0.0675,
+       "moved": [
+        "main#main-content.flex-1.min-w-0",
+        "button.home-utility.home-utility-live",
+        "button.home-utility.home-utility-live"
+       ]
+      }
+     ]
+    }
+   },
+   "home-member": {
+    "median": {
+     "lcp": 2588,
+     "lcpRange": [
+      2524,
+      2640
+     ],
+     "fcp": 2240,
+     "heroMs": 2214.399999999907,
+     "serifMs": null,
+     "cls": 0.09489075695119964,
+     "tbt": 0,
+     "mainThreadMs": 881,
+     "scriptMs": 338,
+     "totalKB": 374.3310546875,
+     "requests": 62,
+     "jsKB": 246.6875,
+     "cssKB": 48.458984375,
+     "fontKB": 74.80078125,
+     "apiCount": 8,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2588,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2438,
+       "value": 0.0949,
+       "moved": [
+        "div.member-home-primary",
+        "div.member-wallet-slot",
+        "button.member-buy-tile.member-buy-data"
+       ]
+      }
+     ]
+    }
+   },
+   "home-member-season": {
+    "median": {
+     "lcp": 2396,
+     "lcpRange": [
+      2380,
+      2512
+     ],
+     "fcp": 2192,
+     "heroMs": 3163.3000000000466,
+     "serifMs": 4050.1999999999534,
+     "cls": 0.13750402251832755,
+     "tbt": 47,
+     "mainThreadMs": 1500,
+     "scriptMs": 489,
+     "totalKB": 496.408203125,
+     "requests": 81,
+     "jsKB": 269.224609375,
+     "cssKB": 65.0537109375,
+     "fontKB": 155.3505859375,
+     "apiCount": 12,
+     "blocked": 7,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2396,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2376,
+       "value": 0.0675,
+       "moved": [
+        "div.member-home",
+        "button.member-service.member-service-website"
+       ]
+      },
+      {
+       "t": 3095,
+       "value": 0.0699,
+       "moved": [
+        "footer.xs-footer"
+       ]
+      },
+      {
+       "t": 4042,
+       "value": 0.0001,
+       "moved": [
+        "span.xm-gift-tag",
+        "span"
+       ]
+      }
+     ]
+    }
+   },
+   "data-guest": {
+    "median": {
+     "lcp": 2564,
+     "lcpRange": [
+      2500,
+      2572
+     ],
+     "fcp": 2160,
+     "heroMs": 2521.4000000001397,
+     "serifMs": null,
+     "cls": 0.27358933015674974,
+     "tbt": 243,
+     "mainThreadMs": 1930,
+     "scriptMs": 554,
+     "totalKB": 332.76953125,
+     "requests": 60,
+     "jsKB": 246.7138671875,
+     "cssKB": 48.4326171875,
+     "fontKB": 32.2333984375,
+     "apiCount": 8,
+     "blocked": 4,
+     "ordinaryFirst": 0,
+     "dialogMs": 283,
+     "inp": 216
+    },
+    "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2564,
+     "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2518,
+       "value": 0.1564,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      },
+      {
+       "t": 2799,
+       "value": 0.0,
+       "moved": []
+      },
+      {
+       "t": 2962,
+       "value": 0.1172,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "section.mh-ds-hero",
+        "div.space-y-2.5.sm:space-y-3"
+       ]
+      }
+     ]
+    }
+   },
+   "data-guest-season": {
+    "median": {
+     "lcp": 2576,
+     "lcpRange": [
+      2556,
+      2604
+     ],
+     "fcp": 2168,
+     "heroMs": 2541.100000000093,
+     "serifMs": 3834.5999999998603,
+     "cls": 0.16845218201191717,
+     "tbt": 267,
+     "mainThreadMs": 2459,
+     "scriptMs": 539,
+     "totalKB": 434.5,
+     "requests": 71,
+     "jsKB": 257.376953125,
+     "cssKB": 59.4658203125,
+     "fontKB": 112.783203125,
+     "apiCount": 6,
+     "blocked": 6,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2576,
+     "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2703,
+       "value": 0.0152,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.space-y-2.5.sm:space-y-3",
+        "div.mh-ds-tile.group"
+       ]
+      },
+      {
+       "t": 2950,
+       "value": 0.0,
+       "moved": []
+      },
+      {
+       "t": 3113,
+       "value": 0.0262,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.mh-ds-tile.group",
+        "div.mh-ds-tile.group"
+       ]
+      },
+      {
+       "t": 3288,
+       "value": 0.1283,
+       "moved": [
+        "section.mh-ds-hero",
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.space-y-2.5.sm:space-y-3"
+       ]
+      }
+     ]
+    }
+   },
+   "orders-member": {
+    "median": {
+     "lcp": 2508,
+     "lcpRange": [
+      2472,
+      2528
+     ],
+     "fcp": 2164,
+     "heroMs": 2379.6999999999534,
+     "serifMs": null,
+     "cls": 0.0016500727886839919,
+     "tbt": 0,
+     "mainThreadMs": 815,
+     "scriptMs": 337,
+     "totalKB": 330.7880859375,
+     "requests": 58,
+     "jsKB": 246.736328125,
+     "cssKB": 48.4326171875,
+     "fontKB": 32.2333984375,
+     "apiCount": 6,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2508,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2615,
+       "value": 0.0017,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      }
+     ]
+    }
+   },
+   "services-guest": {
+    "median": {
+     "lcp": 2440,
+     "lcpRange": [
+      2396,
+      2496
+     ],
+     "fcp": 2124,
+     "heroMs": 2420.600000000093,
+     "serifMs": null,
+     "cls": 0.15643072918376463,
+     "tbt": 32,
+     "mainThreadMs": 869,
+     "scriptMs": 359,
+     "totalKB": 368.2431640625,
+     "requests": 61,
+     "jsKB": 253.7373046875,
+     "cssKB": 51.75,
+     "fontKB": 59.626953125,
+     "apiCount": 4,
+     "blocked": 21,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "span.sd-card-desc “Choose a design, add your details and photos, and publish a ”",
+    "medianRun": {
+     "lcp": 2440,
+     "lcpElement": "span.sd-card-desc “Choose a design, add your details and photos, and publish a ”",
+     "shifts": [
+      {
+       "t": 2420,
+       "value": 0.1564,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      },
+      {
+       "t": 2563,
+       "value": 0.0,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "wallet-member": {
+    "median": {
+     "lcp": 2400,
+     "lcpRange": [
+      2344,
+      2404
+     ],
+     "fcp": 2160,
+     "heroMs": null,
+     "serifMs": null,
+     "cls": 0.41386506420425195,
+     "tbt": 0,
+     "mainThreadMs": 724,
+     "scriptMs": 336,
+     "totalKB": 340.4814453125,
+     "requests": 63,
+     "jsKB": 255.6171875,
+     "cssKB": 48.458984375,
+     "fontKB": 32.2333984375,
+     "apiCount": 6,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.text-sm.text-slate-400 “Use your existing balance for eligible Data and Airtime purc”",
+    "medianRun": {
+     "lcp": 2400,
+     "lcpElement": "p.text-sm.text-slate-400 “Use your existing balance for eligible Data and Airtime purc”",
+     "shifts": [
+      {
+       "t": 2386,
+       "value": 0.204,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      },
+      {
+       "t": 2568,
+       "value": 0.2099,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14",
+        "div.pointer-events-none.absolute.inset-x-0"
+       ]
+      }
+     ]
+    }
+   },
+   "earn-member": {
+    "median": {
+     "lcp": 2880,
+     "lcpRange": [
+      2768,
+      2924
+     ],
+     "fcp": 2192,
+     "heroMs": 2527.399999999907,
+     "serifMs": null,
+     "cls": 0.3138445642090034,
+     "tbt": 42,
+     "mainThreadMs": 1081,
+     "scriptMs": 452,
+     "totalKB": 399.5302734375,
+     "requests": 71,
+     "jsKB": 264.501953125,
+     "cssKB": 55.2236328125,
+     "fontKB": 74.7998046875,
+     "apiCount": 9,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.earn-message-text “I buy my data and other digital services on Mystery Hub. Hav”",
+    "medianRun": {
+     "lcp": 2880,
+     "lcpElement": "p.earn-message-text “I buy my data and other digital services on Mystery Hub. Hav”",
+     "shifts": [
+      {
+       "t": 2526,
+       "value": 0.1564,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      },
+      {
+       "t": 2796,
+       "value": 0.0005,
+       "moved": [
+        "span.earn-milestone-tally"
+       ]
+      },
+      {
+       "t": 2858,
+       "value": 0.1569,
+       "moved": [
+        "div.earn-area-share",
+        "div.earn-area-summary",
+        "div.earn-area-milestones"
+       ]
+      }
+     ]
+    }
+   },
+   "greetings-creator": {
+    "median": {
+     "lcp": 2128,
+     "lcpRange": [
+      2116,
+      2176
+     ],
+     "fcp": 1912,
+     "heroMs": 2117.100000000093,
+     "serifMs": 2862.1999999999534,
+     "cls": 0.009214935154304882,
+     "tbt": 0,
+     "mainThreadMs": 517,
+     "scriptMs": 179,
+     "totalKB": 436.572265625,
+     "requests": 62,
+     "jsKB": 243.0078125,
+     "cssKB": 50.55859375,
+     "fontKB": 140.1767578125,
+     "apiCount": 2,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “When it’s open, you can wrap a personal Christmas or New Yea”",
+    "medianRun": {
+     "lcp": 2128,
+     "lcpElement": "p “When it’s open, you can wrap a personal Christmas or New Yea”",
+     "shifts": [
+      {
+       "t": 2397,
+       "value": 0.008,
+       "moved": [
+        "div.mg-actions",
+        "p"
+       ]
+      },
+      {
+       "t": 2516,
+       "value": 0.0001,
+       "moved": [
+        "a.mg-topbar-mark"
+       ]
+      },
+      {
+       "t": 2857,
+       "value": 0.0011,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "greetings-recipient": {
+    "median": {
+     "lcp": 1840,
+     "lcpRange": [
+      1820,
+      1860
+     ],
+     "fcp": 1840,
+     "heroMs": 1820.9000000001397,
+     "serifMs": 2793.1999999999534,
+     "cls": 0.0019242727673817427,
+     "tbt": 0,
+     "mainThreadMs": 403,
+     "scriptMs": 110,
+     "totalKB": 431.126953125,
+     "requests": 57,
+     "jsKB": 237.9453125,
+     "cssKB": 50.5849609375,
+     "fontKB": 140.1767578125,
+     "apiCount": 2,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “Part of the greeting link may be missing. Ask the person who”",
+    "medianRun": {
+     "lcp": 1840,
+     "lcpElement": "p “Part of the greeting link may be missing. Ask the person who”",
+     "shifts": [
+      {
+       "t": 2331,
+       "value": 0.0012,
+       "moved": [
+        "p"
+       ]
+      },
+      {
+       "t": 2396,
+       "value": 0.0001,
+       "moved": [
+        "a.mg-topbar-mark"
+       ]
+      },
+      {
+       "t": 2769,
+       "value": 0.0006,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "countdown": {
+    "median": {
+     "lcp": 1620,
+     "lcpRange": [
+      1560,
+      1740
+     ],
+     "fcp": 1396,
+     "heroMs": 1363.8999999999069,
+     "serifMs": 2331.5,
+     "cls": 0.006540730155558254,
+     "tbt": 0,
+     "mainThreadMs": 1132,
+     "scriptMs": 166,
+     "totalKB": 262.763671875,
+     "requests": 28,
+     "jsKB": 87.3759765625,
+     "cssKB": 32.775390625,
+     "fontKB": 140.17578125,
+     "apiCount": 3,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.cd-lede “Midnight in Accra is on its way. Share the countdown with th”",
+    "medianRun": {
+     "lcp": 1620,
+     "lcpElement": "p.cd-lede “Midnight in Accra is on its way. Share the countdown with th”",
+     "shifts": [
+      {
+       "t": 1412,
+       "value": 0.0007,
+       "moved": [
+        "div.cd-tools"
+       ]
+      },
+      {
+       "t": 1592,
+       "value": 0.0008,
+       "moved": [
+        "p.cd-when"
+       ]
+      },
+      {
+       "t": 1811,
+       "value": 0.0022,
+       "moved": [
+        "header.cd-head",
+        "p.cd-when"
+       ]
+      },
+      {
+       "t": 1909,
+       "value": 0.0,
+       "moved": []
+      },
+      {
+       "t": 1984,
+       "value": 0.0004,
+       "moved": [
+        "div.cd-share-row"
+       ]
+      },
+      {
+       "t": 2326,
+       "value": 0.0024,
+       "moved": [
+        "span.cd-center-stack",
+        "span.cd-year"
+       ]
+      }
+     ]
+    }
+   },
+   "app-standalone-member": {
+    "median": {
+     "lcp": 2588,
+     "lcpRange": [
+      2552,
+      2652
+     ],
+     "fcp": 2228,
+     "heroMs": 2203.600000000093,
+     "serifMs": null,
+     "cls": 0.09489075695119964,
+     "tbt": 0,
+     "mainThreadMs": 847,
+     "scriptMs": 341,
+     "totalKB": 374.296875,
+     "requests": 63,
+     "jsKB": 246.6650390625,
+     "cssKB": 48.458984375,
+     "fontKB": 74.7998046875,
+     "apiCount": 9,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2588,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2445,
+       "value": 0.0949,
+       "moved": [
+        "div.member-home-primary",
+        "div.member-wallet-slot",
+        "button.member-buy-tile.member-buy-data"
+       ]
+      }
+     ]
+    }
+   }
+  }
+ },
+ "after": {
+  "build": "claude/project-thread-woi73k",
+  "network": {
+   "offline": false,
+   "latency": 150,
+   "downloadThroughput": 200000,
+   "uploadThroughput": 93750
+  },
+  "cpuSlowdown": 4,
+  "runsPerPage": 5,
+  "pages": {
+   "home-guest": {
+    "median": {
+     "lcp": 2372,
+     "lcpRange": [
+      2304,
+      2472
+     ],
+     "fcp": 2372,
+     "heroMs": 2324.5999999996275,
+     "serifMs": null,
+     "cls": 0.01714927527718121,
+     "tbt": 0,
+     "mainThreadMs": 970,
+     "scriptMs": 388,
+     "totalKB": 333.76953125,
+     "requests": 61,
+     "jsKB": 247.1220703125,
+     "cssKB": 48.451171875,
+     "fontKB": 32.2333984375,
+     "apiCount": 9,
+     "blocked": 14,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+    "medianRun": {
+     "lcp": 2372,
+     "lcpElement": "h1#home-headline “Everything digital.One trusted place.”",
+     "shifts": [
+      {
+       "t": 2419,
+       "value": 0.0168,
+       "moved": [
+        "div.home-hero-copy",
+        "section.home-container.home-everyday"
+       ]
+      },
+      {
+       "t": 2776,
+       "value": 0.0004,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "home-guest-season": {
+    "median": {
+     "lcp": 3664,
+     "lcpRange": [
+      2456,
+      3964
+     ],
+     "fcp": 2236,
+     "heroMs": 3051.600000000559,
+     "serifMs": 3566.5,
+     "cls": 0.06750922317558006,
+     "tbt": 234,
+     "mainThreadMs": 2574,
+     "scriptMs": 621,
+     "totalKB": 461.6669921875,
+     "requests": 76,
+     "jsKB": 274.1796875,
+     "cssKB": 68.7646484375,
+     "fontKB": 112.7822265625,
+     "apiCount": 9,
+     "blocked": 19,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "h1#xh-hero-title.xh-hero-title “Everything digital.One trusted place.”",
+    "medianRun": {
+     "lcp": 3664,
+     "lcpElement": "h1#xh-hero-title.xh-hero-title “Everything digital.One trusted place.”",
+     "shifts": [
+      {
+       "t": 2563,
+       "value": 0.0675,
+       "moved": [
+        "main#main-content.flex-1.min-w-0"
+       ]
+      }
+     ]
+    }
+   },
+   "home-member": {
+    "median": {
+     "lcp": 2588,
+     "lcpRange": [
+      2552,
+      2824
+     ],
+     "fcp": 2248,
+     "heroMs": 2220.699999999255,
+     "serifMs": null,
+     "cls": 0.006158196142961057,
+     "tbt": 0,
+     "mainThreadMs": 849,
+     "scriptMs": 340,
+     "totalKB": 375.78515625,
+     "requests": 63,
+     "jsKB": 247.1220703125,
+     "cssKB": 48.451171875,
+     "fontKB": 74.80078125,
+     "apiCount": 9,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2588,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2497,
+       "value": 0.0062,
+       "moved": [
+        "section.member-services"
+       ]
+      }
+     ]
+    }
+   },
+   "home-member-season": {
+    "median": {
+     "lcp": 2680,
+     "lcpRange": [
+      2516,
+      2916
+     ],
+     "fcp": 2244,
+     "heroMs": 2739.7999999998137,
+     "serifMs": 3597.2000000001863,
+     "cls": 0.06759874040642877,
+     "tbt": 99,
+     "mainThreadMs": 1595,
+     "scriptMs": 518,
+     "totalKB": 497.0732421875,
+     "requests": 81,
+     "jsKB": 269.7763671875,
+     "cssKB": 65.072265625,
+     "fontKB": 155.3505859375,
+     "apiCount": 12,
+     "blocked": 5,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2680,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2756,
+       "value": 0.0675,
+       "moved": [
+        "div.xm-home"
+       ]
+      },
+      {
+       "t": 3606,
+       "value": 0.0001,
+       "moved": [
+        "span.xm-gift-tag",
+        "span"
+       ]
+      }
+     ]
+    }
+   },
+   "data-guest": {
+    "median": {
+     "lcp": 2500,
+     "lcpRange": [
+      2480,
+      2660
+     ],
+     "fcp": 2140,
+     "heroMs": 2468,
+     "serifMs": null,
+     "cls": 0.11719122589134687,
+     "tbt": 228,
+     "mainThreadMs": 1872,
+     "scriptMs": 560,
+     "totalKB": 333.958984375,
+     "requests": 60,
+     "jsKB": 247.14453125,
+     "cssKB": 48.451171875,
+     "fontKB": 32.2333984375,
+     "apiCount": 8,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": 294,
+     "inp": 224
+    },
+    "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2500,
+     "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2711,
+       "value": 0.0,
+       "moved": []
+      },
+      {
+       "t": 2855,
+       "value": 0.1172,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "section.mh-ds-hero",
+        "div.space-y-2.5.sm:space-y-3"
+       ]
+      }
+     ]
+    }
+   },
+   "data-guest-season": {
+    "median": {
+     "lcp": 2600,
+     "lcpRange": [
+      2536,
+      2660
+     ],
+     "fcp": 2148,
+     "heroMs": 2570,
+     "serifMs": 3773.7000000001863,
+     "cls": 0.17022276004582107,
+     "tbt": 278,
+     "mainThreadMs": 2308,
+     "scriptMs": 519,
+     "totalKB": 435.189453125,
+     "requests": 70,
+     "jsKB": 257.9072265625,
+     "cssKB": 59.435546875,
+     "fontKB": 112.783203125,
+     "apiCount": 5,
+     "blocked": 7,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2600,
+     "lcpElement": "p “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2719,
+       "value": 0.0139,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.space-y-2.5.sm:space-y-3",
+        "span.mh-ds-nets-thumb"
+       ]
+      },
+      {
+       "t": 3002,
+       "value": 0.028,
+       "moved": [
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.mh-ds-tile.group",
+        "div.mh-ds-tile.group"
+       ]
+      },
+      {
+       "t": 3099,
+       "value": 0.1269,
+       "moved": [
+        "section.mh-ds-hero",
+        "div#data-bundles-section.space-y-3.sm:space-y-4.scroll-mt-24",
+        "div.space-y-2.5.sm:space-y-3"
+       ]
+      }
+     ]
+    }
+   },
+   "orders-member": {
+    "median": {
+     "lcp": 2516,
+     "lcpRange": [
+      2496,
+      2556
+     ],
+     "fcp": 2148,
+     "heroMs": 2364.600000000559,
+     "serifMs": null,
+     "cls": 0.0016500727886839919,
+     "tbt": 0,
+     "mainThreadMs": 788,
+     "scriptMs": 322,
+     "totalKB": 331.955078125,
+     "requests": 58,
+     "jsKB": 247.1708984375,
+     "cssKB": 48.4248046875,
+     "fontKB": 32.2333984375,
+     "apiCount": 6,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2516,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2577,
+       "value": 0.0017,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      }
+     ]
+    }
+   },
+   "services-guest": {
+    "median": {
+     "lcp": 2476,
+     "lcpRange": [
+      2412,
+      2564
+     ],
+     "fcp": 2144,
+     "heroMs": 2448.899999999441,
+     "serifMs": null,
+     "cls": 3.262491836177568e-05,
+     "tbt": 32,
+     "mainThreadMs": 902,
+     "scriptMs": 407,
+     "totalKB": 369.431640625,
+     "requests": 61,
+     "jsKB": 254.1728515625,
+     "cssKB": 51.7421875,
+     "fontKB": 59.6259765625,
+     "apiCount": 4,
+     "blocked": 15,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "span.sd-card-desc “Choose a design, add your details and photos, and publish a ”",
+    "medianRun": {
+     "lcp": 2476,
+     "lcpElement": "span.sd-card-desc “Choose a design, add your details and photos, and publish a ”",
+     "shifts": [
+      {
+       "t": 2549,
+       "value": 0.0,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "wallet-member": {
+    "median": {
+     "lcp": 2384,
+     "lcpRange": [
+      2372,
+      2460
+     ],
+     "fcp": 2148,
+     "heroMs": null,
+     "serifMs": null,
+     "cls": 0.04316783091125537,
+     "tbt": 0,
+     "mainThreadMs": 729,
+     "scriptMs": 351,
+     "totalKB": 341.6953125,
+     "requests": 63,
+     "jsKB": 256.1484375,
+     "cssKB": 48.4248046875,
+     "fontKB": 32.2333984375,
+     "apiCount": 6,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.text-sm.text-slate-400 “Use your existing balance for eligible Data and Airtime purc”",
+    "medianRun": {
+     "lcp": 2384,
+     "lcpElement": "p.text-sm.text-slate-400 “Use your existing balance for eligible Data and Airtime purc”",
+     "shifts": [
+      {
+       "t": 2372,
+       "value": 0.0432,
+       "moved": [
+        "footer.relative.mt-10.sm:mt-14"
+       ]
+      }
+     ]
+    }
+   },
+   "earn-member": {
+    "median": {
+     "lcp": 2836,
+     "lcpRange": [
+      2808,
+      2944
+     ],
+     "fcp": 2140,
+     "heroMs": 2498.7000000001863,
+     "serifMs": null,
+     "cls": 0.03400621892807068,
+     "tbt": 64,
+     "mainThreadMs": 1062,
+     "scriptMs": 438,
+     "totalKB": 400.9033203125,
+     "requests": 71,
+     "jsKB": 265.080078125,
+     "cssKB": 55.279296875,
+     "fontKB": 74.80078125,
+     "apiCount": 9,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.earn-message-text “I buy my data and other digital services on Mystery Hub. Hav”",
+    "medianRun": {
+     "lcp": 2836,
+     "lcpElement": "p.earn-message-text “I buy my data and other digital services on Mystery Hub. Hav”",
+     "shifts": [
+      {
+       "t": 2767,
+       "value": 0.0001,
+       "moved": []
+      },
+      {
+       "t": 2812,
+       "value": 0.0339,
+       "moved": [
+        "div.earn-share-actions",
+        "div.earn-share-more",
+        "button.earn-secondary.earn-refresh"
+       ]
+      }
+     ]
+    }
+   },
+   "greetings-creator": {
+    "median": {
+     "lcp": 1708,
+     "lcpRange": [
+      1628,
+      1728
+     ],
+     "fcp": 1464,
+     "heroMs": 1691.7999999998137,
+     "serifMs": 2422.5,
+     "cls": 0.009214935154304882,
+     "tbt": 0,
+     "mainThreadMs": 530,
+     "scriptMs": 221,
+     "totalKB": 273.630859375,
+     "requests": 29,
+     "jsKB": 92.375,
+     "cssKB": 37.5322265625,
+     "fontKB": 140.17578125,
+     "apiCount": 2,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “When it’s open, you can wrap a personal Christmas or New Yea”",
+    "medianRun": {
+     "lcp": 1708,
+     "lcpElement": "p “When it’s open, you can wrap a personal Christmas or New Yea”",
+     "shifts": [
+      {
+       "t": 1996,
+       "value": 0.008,
+       "moved": [
+        "div.mg-actions",
+        "p"
+       ]
+      },
+      {
+       "t": 2073,
+       "value": 0.0001,
+       "moved": [
+        "a.mg-topbar-mark"
+       ]
+      },
+      {
+       "t": 2436,
+       "value": 0.0011,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "greetings-recipient": {
+    "median": {
+     "lcp": 1348,
+     "lcpRange": [
+      1324,
+      1384
+     ],
+     "fcp": 1348,
+     "heroMs": 1328.2000000001863,
+     "serifMs": 2283.2000000001863,
+     "cls": 0.0019242727673817427,
+     "tbt": 0,
+     "mainThreadMs": 377,
+     "scriptMs": 113,
+     "totalKB": 268.1181640625,
+     "requests": 24,
+     "jsKB": 87.2490234375,
+     "cssKB": 37.5322265625,
+     "fontKB": 140.1767578125,
+     "apiCount": 2,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p “Part of the greeting link may be missing. Ask the person who”",
+    "medianRun": {
+     "lcp": 1348,
+     "lcpElement": "p “Part of the greeting link may be missing. Ask the person who”",
+     "shifts": [
+      {
+       "t": 1848,
+       "value": 0.0012,
+       "moved": [
+        "p"
+       ]
+      },
+      {
+       "t": 1914,
+       "value": 0.0001,
+       "moved": [
+        "a.mg-topbar-mark"
+       ]
+      },
+      {
+       "t": 2280,
+       "value": 0.0006,
+       "moved": []
+      }
+     ]
+    }
+   },
+   "countdown": {
+    "median": {
+     "lcp": 1636,
+     "lcpRange": [
+      1588,
+      1748
+     ],
+     "fcp": 1408,
+     "heroMs": 1370.7999999998137,
+     "serifMs": 2365.7999999998137,
+     "cls": 0.006540730155558254,
+     "tbt": 0,
+     "mainThreadMs": 910,
+     "scriptMs": 190,
+     "totalKB": 263.6201171875,
+     "requests": 28,
+     "jsKB": 87.4931640625,
+     "cssKB": 32.7734375,
+     "fontKB": 140.1767578125,
+     "apiCount": 3,
+     "blocked": 1,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.cd-lede “Midnight in Accra is on its way. Share the countdown with th”",
+    "medianRun": {
+     "lcp": 1636,
+     "lcpElement": "p.cd-lede “Midnight in Accra is on its way. Share the countdown with th”",
+     "shifts": [
+      {
+       "t": 1426,
+       "value": 0.0007,
+       "moved": [
+        "div.cd-tools"
+       ]
+      },
+      {
+       "t": 1610,
+       "value": 0.0008,
+       "moved": [
+        "p.cd-when"
+       ]
+      },
+      {
+       "t": 1892,
+       "value": 0.0022,
+       "moved": [
+        "header.cd-head",
+        "p.cd-when"
+       ]
+      },
+      {
+       "t": 1941,
+       "value": 0.0004,
+       "moved": [
+        "div.cd-share-row"
+       ]
+      },
+      {
+       "t": 2311,
+       "value": 0.0024,
+       "moved": [
+        "span.cd-center-stack",
+        "span.cd-year"
+       ]
+      }
+     ]
+    }
+   },
+   "app-standalone-member": {
+    "median": {
+     "lcp": 2648,
+     "lcpRange": [
+      2608,
+      2776
+     ],
+     "fcp": 2304,
+     "heroMs": 2276.5999999996275,
+     "serifMs": null,
+     "cls": 0.006158196142961057,
+     "tbt": 0,
+     "mainThreadMs": 979,
+     "scriptMs": 397,
+     "totalKB": 375.7744140625,
+     "requests": 64,
+     "jsKB": 247.099609375,
+     "cssKB": 48.451171875,
+     "fontKB": 74.8017578125,
+     "apiCount": 10,
+     "blocked": 3,
+     "ordinaryFirst": 0,
+     "dialogMs": null,
+     "inp": null
+    },
+    "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+    "medianRun": {
+     "lcp": 2648,
+     "lcpElement": "p.mh-svc-bar-line “MTN Data purchases are paused for maintenance. Expected resu”",
+     "shifts": [
+      {
+       "t": 2542,
+       "value": 0.0062,
+       "moved": [
+        "section.member-services"
+       ]
+      }
+     ]
+    }
+   }
+  }
+ }
+}

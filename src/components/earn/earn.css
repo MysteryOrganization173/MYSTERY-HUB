@@ -35,6 +35,9 @@
 .earn-page .earn-heading-lede { margin-top: 6px; color: #c5d6cd; font-size: .92rem; max-width: 560px; }
 .earn-page .earn-next { margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; color: #a9f3cb; font-size: .84rem; font-weight: 600; }
 .earn-page .earn-next::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--earn-bright); flex-shrink: 0; }
+/* 3.7.3: on a phone the next step usually takes two lines, and its text changes once the account is checked; two lines are
+   always kept there, so the page does not jump when it does (a one-line step leaves a little space below it). */
+@media (max-width: 559px) { .earn-page .earn-next { min-height: 3em; min-height: 2lh; } }
 .earn-heading > button { flex-shrink: 0; }
 
 /* Money strip: the real balance stays one glance away, without dominating the page. */
@@ -86,6 +89,10 @@
 .earn-topics label.is-active span { background: #d6f8e5; border-color: #d6f8e5; color: #04220f; }
 .earn-topics:disabled label { cursor: not-allowed; opacity: .55; }
 .earn-message { position: relative; background: #07120e; border: 1px solid #1f3b2e; border-radius: 4px 16px 16px 16px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+/* 3.7.3: while the link loads, the topics and the message keep the shape they will have, so the panel does not jump. */
+.earn-share-panel.is-loading .earn-topics > div { flex-wrap: nowrap; overflow: hidden; }
+.earn-share-panel.is-loading .earn-message { min-height: 8rem; }
+.earn-referral-identity.is-placeholder { visibility: hidden; }
 .earn-page .earn-message-label { font-size: .7rem; color: #81a892; }
 .earn-page .earn-message-text { color: #e7f4ec; font-size: .9rem; line-height: 1.5; }
 .earn-message-text span { color: var(--earn-bright); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; word-break: break-all; }

@@ -12,9 +12,11 @@ test('the entry script picks one surface and loads only that code',()=>{
   for(const lazy of ["import('./components/website/PublicPublishedSite')","import('./components/website/IsolatedTemplatePreview')","import('./App.tsx')"])assert.ok(main.includes(lazy),lazy);
   assert.match(main,/\/\^\\\/sites\\\/\(\[\^\/\?#\]\+\)\//,'same /sites/:slug rule as App.tsx');
   assert.match(readFileSync('src/App.tsx','utf8'),/pathname\.match\(\/\^\\\/sites\\\/\(\[\^\/\?#\]\+\)\/\)/);
+  // 3.7.3: the head script (utils/startupHints) starts the app download on app pages and never on business websites;
+  // performanceMobile373 runs the script itself for every path.
   const vite=readFileSync('vite.config.ts','utf8');
-  assert.match(vite,/preloadMainApp\(\)/,'other pages start downloading the app straight away');
-  assert.match(vite,/if\(!\/\^\\\\\/sites\\\\\/\/\.test\(location\.pathname\)/,'but never on business websites');
+  assert.match(vite,/startupHints\(loadEnv\(/,'other pages start downloading the app straight away');
+  assert.match(readFileSync('src/utils/startupHints.ts','utf8'),/if\(\$\{NO_APP_PATHS\.sites\}\.test\(p\)\|\|/,'but never on business websites');
 });
 
 test('the unreachable demo renderer with fake cart and booking is gone',()=>{

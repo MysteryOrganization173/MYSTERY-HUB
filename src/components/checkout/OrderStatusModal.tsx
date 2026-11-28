@@ -1,5 +1,6 @@
 import './receipt.css';
 import { OrderShield } from './OrderShield';
+import { startReceiptChecks } from '../../utils/receiptChecks';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { dataOrderPresentation, dataRecipientDisplay } from '../../utils/dataPurchasePresentation';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -156,9 +157,15 @@ export const OrderStatusModal: React.FC = () => {
       }
     };
 
-    fetchServerStatus();
-    const interval = setInterval(fetchServerStatus, 3000);
-    return () => { alive = false; clearInterval(interval); };
+    // 3.7.3: every 3 s while the order can still move, as before; a cancelled or expired payment more gently (a late
+    // approval still shows); nothing while the app is in the background, and a check at once on return. receiptChecks.ts
+    const stop = startReceiptChecks({
+      check: fetchServerStatus,
+      serverStatus: () => latest.current.activeOrder?.serverStatus,
+      isHidden: () => document.visibilityState === 'hidden',
+      onVisibility: listener => { document.addEventListener('visibilitychange', listener); return () => document.removeEventListener('visibilitychange', listener); },
+    });
+    return () => { alive = false; stop(); };
   }, [isStatusModalOpen, lookupReference, isTerminal]);
 
   const dialogRef = useDialogFocus(isStatusModalOpen && !!activeOrder, closeOrderStatus);

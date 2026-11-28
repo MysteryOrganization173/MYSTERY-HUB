@@ -23,7 +23,7 @@
 .sd-search > svg { position: absolute; left: 14px; color: var(--sd-text-3); pointer-events: none; }
 .sd-search input { width: 100%; min-height: 50px; padding: 0 48px 0 44px; border-radius: 14px; border: 1px solid #2a3a33; background: #0b1311; color: var(--sd-text); font-size: 1rem; transition: border-color 150ms, background-color 150ms; }
 .sd-search input::placeholder { color: #7f948b; }
-.sd-search input:focus { outline: none; border-color: var(--brand-green); background: #0d1714; }
+.sd-search input:focus { border-color: var(--brand-green); background: #0d1714; }
 .sd-search input::-webkit-search-cancel-button { display: none; }
 .sd-search-clear { position: absolute; right: 4px; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--sd-text-2); cursor: pointer; }
 .sd-search-clear:hover { color: var(--sd-text); background: #15211c; }

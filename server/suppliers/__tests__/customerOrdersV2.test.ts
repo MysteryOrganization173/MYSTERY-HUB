@@ -190,7 +190,8 @@ test('receipt keeps server-authoritative tracking and copies only the reference'
   const status = source('src/components/checkout/OrderStatusModal.tsx');
   assert.match(status, /navigator.clipboard.writeText\(displayRef\)/);
   assert.match(status, /catch \{\s*showToast\(/);
-  assert.match(status, /setInterval\(fetchServerStatus, 3000\)/);
+  // 3.7.3: the schedule (3 s while the order can move) lives in utils/receiptChecks; performanceMobile373 tests it.
+  assert.match(status, /startReceiptChecks\(\{\s*check: fetchServerStatus,/);
   assert.ok(!status.includes('or retry'), 'failed orders must not invite a repeat purchase');
   for (const internal of ['supplier_order_id', 'supplier_response', 'failure_reason', 'admin_note']) assert.ok(!status.includes(internal), internal);
 });
