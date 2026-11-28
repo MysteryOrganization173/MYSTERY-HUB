@@ -16,7 +16,7 @@ import { areGhanaPhonesEqual } from '../utils/phone.js';
 export const ACTIVE_MTN_ORDER_CODE = 'ACTIVE_MTN_ORDER_EXISTS';
 
 export const ACTIVE_MTN_ORDER_MESSAGE =
-  'You already have an MTN bundle being processed for this number. Please wait for it to be completed before placing another order.';
+  'An MTN order is already being processed for this number. Please wait for it to finish before placing another order.';
 
 // Authoritative blocking statuses for MTN
 export const MTN_BLOCKING_STATUSES: readonly OrderStatus[] = [
@@ -91,4 +91,16 @@ export function mapToSafeCustomerStatus(status: OrderStatus): string {
     default:
       return status;
   }
+}
+
+/** Recipient equality blocks a duplicate, but only the signed-in order owner gets tracking details. */
+export function activeMtnOrderConflict(order: Pick<OrderRecord, 'user_id' | 'public_reference' | 'status'>, requesterId?: string) {
+  return {
+    code: ACTIVE_MTN_ORDER_CODE,
+    message: ACTIVE_MTN_ORDER_MESSAGE,
+    ...(requesterId && order.user_id === requesterId ? {
+      existingOrderReference: order.public_reference,
+      existingOrderStatus: mapToSafeCustomerStatus(order.status),
+    } : {}),
+  };
 }
