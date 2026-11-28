@@ -1,0 +1,251 @@
+/*
+ * Mystery Countdown (/countdown). Loaded only with this page.
+ * Midnight navy and plum, champagne gold, silver and ivory. Every decorative motion is transform or opacity, runs once
+ * (or follows the clock itself), and stops with reduced motion. Nothing loops forever.
+ */
+.cd-page {
+  --cd-ink: #03040c; --cd-navy: #070b22; --cd-navy-2: #141c4a; --cd-plum: #3a1a50;
+  --cd-gold: #e3c27a; --cd-gold-2: #f6e3b0; --cd-gold-3: #b8924a; --cd-silver: #c9cde0;
+  --cd-ivory: #f7f2e6; --cd-text-2: #c9cbdb; --cd-text-3: #9ea2bb;
+  --cd-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --cd-sans: 'Plus Jakarta Sans', 'Noto Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cd-display: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cd-ease: cubic-bezier(.2, .7, .2, 1);
+  position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; overflow-x: hidden;
+  color: var(--cd-ivory); font-family: var(--cd-sans); background: var(--cd-ink);
+  -webkit-font-smoothing: antialiased;
+}
+.cd-page *, .cd-page *::before, .cd-page *::after { box-sizing: border-box; }
+.cd-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.cd-icon { width: 18px; height: 18px; flex: none; }
+
+/* ───────── The sky: a fixed backdrop with a few stage layers that only ever change opacity ───────── */
+.cd-sky { position: fixed; inset: 0; z-index: -1; overflow: hidden;
+  background: radial-gradient(130% 85% at 50% -12%, var(--cd-navy-2) 0%, #0b1131 40%, var(--cd-navy) 62%, var(--cd-ink) 100%); }
+.cd-sky-layer { position: absolute; inset: 0; opacity: 0; transition: opacity 2.4s ease; }
+.cd-sky-layer.is-eve { background: radial-gradient(95% 55% at 50% 108%, #3a1a50cc, #2a124000 72%); }
+.cd-sky-layer.is-focus { background: radial-gradient(closest-side circle at 50% 44%, #00000000 58%, #000000a6 100%); }
+.cd-sky-layer.is-final { background: radial-gradient(circle at 50% 44%, #e3c27a30, #e3c27a00 46%); }
+.cd-sky-layer.is-bloom { background: radial-gradient(circle at 50% 42%, #f6e3b05e, #e3c27a1f 34%, #e3c27a00 66%); }
+.cd-stars { position: absolute; inset: 0; width: 100%; height: 100%; fill: #f4f1ff; transition: opacity 2.4s ease;
+  /* Stars keep clear of the words and the dial in the middle of the page. */
+  -webkit-mask-image: radial-gradient(ellipse 34% 46% at 50% 40%, #0000 55%, #000 100%); mask-image: radial-gradient(ellipse 34% 46% at 50% 40%, #0000 55%, #000 100%); }
+.cd-stars .is-twinkle { animation: cd-twinkle 1.2s ease-in-out 2 alternate both; }
+.cd-horizon { position: absolute; left: -25%; right: -25%; bottom: -38vh; height: 62vh; border-radius: 50%;
+  background: radial-gradient(closest-side, #e3c27a1a, #3a1a5012 60%, #00000000); }
+
+.cd-page[data-stage="days"] .is-eve { opacity: .4; }
+.cd-page[data-stage="eve"] .is-eve { opacity: 1; }
+.cd-page[data-stage="hour"] .is-eve, .cd-page[data-stage="hour"] .is-focus { opacity: 1; }
+.cd-page[data-stage="minute"] .is-eve, .cd-page[data-stage="minute"] .is-focus { opacity: 1; }
+.cd-page[data-stage="minute"] .is-final { opacity: .45; }
+.cd-page[data-stage="final"] .is-focus { opacity: 1; }
+/* The light gathers steadily across the last ten seconds (one slow fade, never a flash). */
+.cd-page[data-stage="final"] .is-final { opacity: 1; transition: opacity 10s linear; }
+.cd-page[data-stage="hour"] .cd-stars { opacity: .75; }
+.cd-page[data-stage="minute"] .cd-stars, .cd-page[data-stage="final"] .cd-stars { opacity: .45; }
+.cd-page[data-stage="welcome"] .is-eve { opacity: .8; }
+.cd-page[data-stage="welcome"] .is-bloom { opacity: .4; }
+.cd-page[data-stage="commemorative"] .is-eve { opacity: .5; }
+.cd-page[data-stage="commemorative"] .is-bloom { opacity: .2; }
+.cd-page[data-celebration] .is-bloom { animation: cd-bloom 3.4s ease-out both; }
+
+/* ───────── Shell ───────── */
+.cd-shell { position: relative; width: 100%; max-width: 760px; min-height: 100vh; min-height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; align-items: center;
+  padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.cd-topbar { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: opacity .8s ease; }
+.cd-page[data-stage="final"] .cd-topbar, .cd-page[data-stage="minute"] .cd-topbar { opacity: .55; }
+.cd-mark { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 4px; border-radius: 999px; color: var(--cd-text-2); text-decoration: none;
+  font: 600 .78rem/1 var(--cd-display); letter-spacing: .06em; }
+.cd-mark img { display: block; }
+.cd-tools { display: flex; gap: 6px; margin-left: auto; }
+.cd-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  color: var(--cd-text-2); background: #ffffff0a; border: 1px solid #ffffff1f; font: 600 .78rem/1 var(--cd-display); letter-spacing: .02em;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: background-color .2s ease, color .2s ease; }
+.cd-tool:hover { color: var(--cd-ivory); background: #ffffff14; }
+.cd-tool[aria-pressed="true"] { color: var(--cd-gold-2); border-color: #e3c27a55; }
+@media (max-width: 419px) {
+  .cd-tool { padding: 0; }
+  .cd-tool-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* ───────── Words ───────── */
+.cd-head { margin-top: clamp(6px, 2.4vh, 26px); text-align: center; }
+.cd-kicker { margin: 0; font: 700 .7rem/1.3 var(--cd-display); letter-spacing: .24em; text-transform: uppercase; color: var(--cd-gold); }
+.cd-title { margin: .32em 0 0; padding-bottom: .06em; font: italic 500 clamp(2rem, 8.6vw, 3.5rem)/1.04 var(--cd-serif); letter-spacing: -.02em; text-wrap: balance;
+  color: var(--cd-ivory); background: linear-gradient(180deg, #fffaf0 20%, #e7d6ab); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; outline: none;
+  transition: opacity .8s ease; }
+.cd-title-quiet { opacity: .5; }
+.cd-page[data-celebration] .cd-title { animation: cd-up .9s var(--cd-ease) .55s both; }
+.cd-lede { max-width: 34ch; margin: .65em auto 0; color: var(--cd-text-2); font-size: .98rem; line-height: 1.55; text-wrap: pretty; }
+
+/* ───────── The Midnight Dial ───────── */
+.cd-stage { width: 100%; margin-top: clamp(10px, 3vh, 30px); display: flex; flex-direction: column; align-items: center; }
+.cd-dial { position: relative; width: min(84vw, 46vh, 440px); width: min(84vw, 46dvh, 440px); aspect-ratio: 1; container-type: inline-size; }
+.cd-dial-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.cd-ring-hair { fill: none; stroke: #ffffff14; stroke-width: 1; }
+.cd-ring-hair.is-inner { stroke: #e3c27a14; }
+.cd-ticks line { stroke: #c9cde052; stroke-width: 1.2; stroke-linecap: round; }
+.cd-ticks line.is-major { stroke: #e3c27ab0; stroke-width: 1.8; }
+.cd-ring-track { fill: none; stroke: #ffffff12; stroke-width: 3; }
+.cd-ring-lit { fill: none; stroke: url(#cd-gold); stroke-width: 3.4; stroke-linecap: round; transition: stroke-dashoffset .95s linear; }
+.cd-page[data-stage="minute"] .cd-ring-lit { stroke-width: 4.4; }
+.cd-second { transform-box: view-box; transform-origin: 160px 160px; transition: transform .5s var(--cd-ease); }
+.cd-second-dot { fill: #fff6dc; }
+.cd-second-glow { fill: var(--cd-gold); opacity: .22; }
+.cd-segments path { fill: none; stroke: #ffffff1c; stroke-width: 6; stroke-linecap: round; transition: stroke .35s ease; }
+.cd-segments path.is-lit { stroke: var(--cd-gold); }
+.cd-midnight-star { fill: var(--cd-gold); opacity: .75; transition: opacity .6s ease, fill .6s ease; }
+.cd-page[data-stage="final"] .cd-midnight-star, .cd-dial[data-celebrating] .cd-midnight-star, .cd-page[data-stage="welcome"] .cd-midnight-star { fill: #fff6dc; opacity: 1; }
+.cd-dial[data-celebrating] .cd-dial-svg { animation: cd-dial-breath 1.8s var(--cd-ease) .15s both; }
+/* At midnight the ring fills once, clockwise from 12, as the 7 fills with light. */
+.cd-dial[data-celebrating] .cd-ring-lit { animation: cd-sweep 1.25s cubic-bezier(.45, 0, .2, 1) both; }
+.cd-dial-center { position: absolute; inset: 15%; display: grid; place-items: center; text-align: center; }
+.cd-center-stack { display: grid; justify-items: center; }
+.cd-center-caption { margin-top: .9em; font: 700 .62rem/1 var(--cd-display); font-size: 3.3cqi; letter-spacing: .26em; text-transform: uppercase; color: #c9cde0b8; }
+
+/* 2027: ivory "202", and a waiting outlined 7 that fills with light from below at midnight. */
+.cd-year { position: relative; display: inline-flex; align-items: baseline; font: italic 600 clamp(3rem, 19vw, 7.4rem)/1 var(--cd-serif); font-size: 25cqi; letter-spacing: -.035em; color: #ece7da; }
+.cd-year[data-small] { font-size: clamp(1.4rem, 7vw, 2.4rem); font-size: 10cqi; }
+.cd-year-base { background: linear-gradient(180deg, #ffffff, #cfd2e2); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; transition: filter 1.2s ease; }
+.cd-year-seven { position: relative; display: inline-block; padding-right: .04em; }
+.cd-year-seven::before { content: ''; position: absolute; left: 50%; top: 52%; width: 1.5em; height: 1.5em; margin: -.75em 0 0 -.75em; border-radius: 50%; background: radial-gradient(closest-side, #e3c27a38, #e3c27a00); opacity: 0; transition: opacity 1.2s ease; pointer-events: none; }
+.cd-seven-outline { position: relative; color: transparent; -webkit-text-fill-color: transparent; -webkit-text-stroke: 1.4px #e3c27acc; }
+.cd-seven-fill { position: absolute; inset: 0; overflow: hidden; transform: translateY(102%); }
+.cd-seven-fill > span { display: block; transform: translateY(-102%); background: linear-gradient(180deg, #fff6dc, var(--cd-gold) 55%, var(--cd-gold-3)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.cd-page[data-stage="eve"] .cd-year-seven::before, .cd-page[data-stage="hour"] .cd-year-seven::before { opacity: .45; }
+.cd-page[data-stage="eve"] .cd-seven-outline, .cd-page[data-stage="hour"] .cd-seven-outline, .cd-page[data-stage="minute"] .cd-seven-outline { -webkit-text-stroke-color: #f1d38f; }
+.cd-year[data-lit] .cd-seven-fill, .cd-year[data-lit] .cd-seven-fill > span { transform: none; }
+.cd-year[data-lit] .cd-year-seven::before { opacity: .9; }
+.cd-year[data-igniting] .cd-seven-fill { animation: cd-rise-outer 1.5s cubic-bezier(.35, .1, .2, 1) .2s both; }
+.cd-year[data-igniting] .cd-seven-fill > span { animation: cd-rise-inner 1.5s cubic-bezier(.35, .1, .2, 1) .2s both; }
+.cd-year[data-igniting] .cd-year-seven::before { animation: cd-glow 2.4s ease-out .4s both; }
+
+.cd-minute { display: grid; justify-items: center; gap: 1cqi; }
+.cd-minute-number { font: italic 600 clamp(4rem, 26vw, 9rem)/.92 var(--cd-serif); font-size: 33cqi; letter-spacing: -.03em; font-variant-numeric: lining-nums tabular-nums; color: var(--cd-ivory); }
+.cd-minute-label { font: 700 .62rem/1 var(--cd-display); font-size: 3.3cqi; letter-spacing: .26em; text-transform: uppercase; color: var(--cd-gold); }
+.cd-final-number { display: block; font: italic 600 clamp(6rem, 40vw, 15rem)/1 var(--cd-serif); font-size: 50cqi; letter-spacing: -.04em; font-variant-numeric: lining-nums;
+  background: linear-gradient(180deg, #fff8e4 15%, var(--cd-gold) 70%, var(--cd-gold-3)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: cd-count .62s cubic-bezier(.2, .8, .2, 1) both; }
+.cd-replay-note { margin: 10px 0 0; padding: 6px 12px; border-radius: 999px; border: 1px solid #e3c27a40; color: var(--cd-gold-2); font: 700 .66rem/1 var(--cd-display); letter-spacing: .2em; text-transform: uppercase; }
+
+/* The single celebration: rays and champagne sparks out of the ring, once. */
+.cd-burst { position: absolute; inset: 0; pointer-events: none; }
+.cd-ray { position: absolute; left: 50%; top: 50%; width: 20cqi; height: 1.5px; margin-top: -.75px; transform-origin: 0 50%; opacity: 0;
+  background: linear-gradient(90deg, #f6e3b0, #f6e3b000); animation: cd-ray 1.6s cubic-bezier(.2, .7, .2, 1) calc(.35s + var(--d)) both; }
+.cd-spark { position: absolute; left: 50%; top: 50%; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); border-radius: 50%; opacity: 0;
+  background: #fff3d0; box-shadow: 0 0 6px 1px #e3c27a99; animation: cd-spark 1.9s cubic-bezier(.15, .7, .25, 1) calc(.4s + var(--d)) both; }
+
+/* ───────── Timer row and honest states ───────── */
+.cd-timer-wrap { margin-top: clamp(12px, 2.6vh, 26px); display: grid; justify-items: center; gap: 10px; }
+.cd-timer { display: grid; justify-items: center; }
+.cd-cells { display: flex; padding: 12px 4px 10px; border-radius: 22px; border: 1px solid #e3c27a2b;
+  background: linear-gradient(180deg, #ffffff0f, #ffffff05); box-shadow: inset 0 1px 0 #ffffff14, 0 18px 40px -28px #000; }
+.cd-cell { position: relative; display: grid; justify-items: center; padding: 0 clamp(10px, 3.6vw, 22px); }
+.cd-cell + .cd-cell::before { content: ''; position: absolute; left: 0; top: 12%; bottom: 34%; width: 1px; background: #e3c27a33; }
+.cd-digits { display: inline-flex; font: 600 clamp(1.85rem, 8.2vw, 2.8rem)/1 var(--cd-display); color: var(--cd-ivory); }
+.cd-digits > span { display: inline-block; width: .62em; text-align: center; }
+.cd-cell-label { margin-top: 7px; font: 700 .6rem/1 var(--cd-display); letter-spacing: .2em; text-transform: uppercase; color: var(--cd-text-3); }
+.cd-page[data-stage="eve"] .cd-digits { font-size: clamp(2.2rem, 10vw, 3.3rem); }
+.cd-page[data-stage="hour"] .cd-digits { font-size: clamp(2.8rem, 13vw, 4.2rem); }
+.cd-page[data-stage="eve"] .cd-cells, .cd-page[data-stage="hour"] .cd-cells { border-color: #e3c27a45; }
+.cd-when { margin: 0; color: var(--cd-text-3); font-size: .78rem; line-height: 1.4; text-align: center; }
+.cd-timer-wrap.is-pending .cd-cells { opacity: .4; }
+.cd-pending-note { margin: 0; color: var(--cd-text-2); font-size: .78rem; line-height: 1.4; text-align: center; }
+.cd-lede.is-reserve { visibility: hidden; }
+.cd-status { margin: clamp(14px, 3vh, 26px) 0 0; color: var(--cd-text-2); font-size: .95rem; line-height: 1.5; text-align: center; }
+.cd-status-error { display: grid; justify-items: center; gap: 12px; }
+.cd-status-error p { margin: 0; }
+.cd-page[data-stage="syncing"] .cd-dial, .cd-page[data-stage="unavailable"] .cd-dial, .cd-page[data-stage="confirming"] .cd-dial { opacity: .55; }
+
+/* ───────── Sharing and the way back ───────── */
+.cd-actions { width: 100%; margin-top: auto; padding-top: clamp(18px, 4vh, 40px); display: grid; justify-items: center; gap: 12px; text-align: center; }
+.cd-share { display: grid; justify-items: center; }
+.cd-share-lede { margin: 0 0 10px; color: var(--cd-text-2); font-size: .92rem; }
+.cd-share-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.cd-share-note { min-height: 1.3em; margin: 8px 0 0; color: var(--cd-gold-2); font-size: .82rem; }
+.cd-url { color: var(--cd-ivory); font-weight: 600; user-select: all; -webkit-user-select: all; }
+.cd-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: 999px; border: 1px solid transparent; cursor: pointer;
+  font: 700 .92rem/1 var(--cd-display); text-decoration: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform .15s var(--cd-ease), background-color .2s ease, border-color .2s ease; }
+.cd-btn:active { transform: scale(.97); }
+.cd-btn-gold { color: #1d1506; background: linear-gradient(180deg, #f8e7b9, var(--cd-gold) 55%, #c9a35a); box-shadow: 0 10px 24px -14px var(--cd-gold), inset 0 1px 0 #ffffffa6; }
+.cd-btn-ghost { color: var(--cd-ivory); background: #ffffff0d; border-color: #ffffff29; }
+.cd-btn-ghost:hover { background: #ffffff17; }
+.cd-actions[data-quiet] .cd-btn { min-height: 44px; font-size: .84rem; }
+.cd-home { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 999px; color: var(--cd-gold-2); text-decoration: none; font: 700 .9rem/1 var(--cd-display); }
+.cd-home:hover { color: #fff6dc; }
+.cd-fine { margin: 0; max-width: 38ch; color: var(--cd-text-3); font-size: .74rem; line-height: 1.5; }
+.cd-btn:focus-visible, .cd-tool:focus-visible, .cd-home:focus-visible, .cd-mark:focus-visible { outline: 3px solid var(--cd-gold-2); outline-offset: 3px; }
+
+/* ───────── Immersive view ───────── */
+.cd-page[data-immersive] .cd-lede, .cd-page[data-immersive] .cd-when { display: none; }
+.cd-page[data-immersive] .cd-shell { justify-content: center; }
+.cd-page[data-immersive] .cd-topbar { position: absolute; top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); width: auto; opacity: .8; }
+.cd-page[data-immersive] .cd-dial { width: min(90vw, 62vh, 640px); width: min(90vw, 62dvh, 640px); }
+.cd-page:fullscreen { overflow-y: auto; }
+
+/* ───────── Sizes ───────── */
+@media (min-width: 900px) {
+  .cd-shell { max-width: 880px; }
+  .cd-title { font-size: clamp(2.8rem, 4vw, 3.6rem); }
+  .cd-dial { width: min(44vh, 430px); width: min(44dvh, 430px); }
+  .cd-stage { margin-top: clamp(10px, 2.4vh, 24px); }
+}
+@media (max-height: 720px) and (orientation: portrait) {
+  .cd-dial { width: min(78vw, 40vh, 440px); width: min(78vw, 40dvh, 440px); }
+  .cd-title { font-size: clamp(1.8rem, 7.6vw, 2.6rem); }
+  .cd-lede { font-size: .9rem; margin-top: .45em; }
+}
+@media (max-height: 620px) and (orientation: portrait) {
+  .cd-fine, .cd-share-lede { display: none; }
+  .cd-dial { width: min(74vw, 36vh); width: min(74vw, 36dvh); }
+}
+/* Phones turned sideways: the dial beside the words, so nothing needs scrolling to see the time. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .cd-shell { max-width: 1000px; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: 'top top' 'stage head' 'stage actions';
+    column-gap: clamp(20px, 4vw, 48px); align-items: center; }
+  .cd-topbar { grid-area: top; }
+  .cd-head { grid-area: head; margin-top: 0; text-align: left; align-self: end; }
+  .cd-lede { margin-left: 0; }
+  .cd-stage { grid-area: stage; margin-top: 0; }
+  .cd-actions { grid-area: actions; align-self: start; margin-top: 0; padding-top: 14px; justify-items: start; text-align: left; }
+  .cd-share { justify-items: start; }
+  .cd-share-row { justify-content: flex-start; }
+  .cd-topbar { min-height: 40px; }
+  .cd-dial { width: min(50vh, 40vw); width: min(50dvh, 40vw); }
+  .cd-timer-wrap { margin-top: 8px; gap: 6px; }
+  .cd-cells { padding: 8px 2px 7px; }
+  .cd-page .cd-digits { font-size: clamp(1.4rem, 7vh, 2rem); }
+  .cd-cell-label { margin-top: 5px; }
+  .cd-when { display: none; }
+  .cd-title { font-size: clamp(1.8rem, 9vh, 2.8rem); }
+  .cd-page[data-immersive] .cd-shell { grid-template-areas: 'top top' 'stage head' 'stage head'; }
+  .cd-page[data-immersive] .cd-dial { width: min(58vh, 46vw); width: min(58dvh, 46vw); }
+  /* The time stays at the top, however long the words beside it run. */
+  .cd-stage { align-self: start; }
+}
+/* Small phones sideways (iPhone SE and similar): only the essentials beside the dial. */
+@media (orientation: landscape) and (max-height: 420px) {
+  .cd-lede, .cd-fine, .cd-share-lede { display: none; }
+}
+
+/* ───────── Motion ───────── */
+@keyframes cd-twinkle { from { opacity: inherit; } to { opacity: .1; } }
+@keyframes cd-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes cd-bloom { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: .4; } }
+@keyframes cd-count { from { opacity: 0; transform: scale(1.22); } 55% { opacity: 1; } to { opacity: 1; transform: scale(1); } }
+@keyframes cd-dial-breath { 0% { transform: scale(.97); } 45% { transform: scale(1.025); } 100% { transform: scale(1); } }
+@keyframes cd-sweep { from { stroke-dashoffset: 854.51px; } to { stroke-dashoffset: 0; } }
+@keyframes cd-rise-outer { from { transform: translateY(102%); } to { transform: translateY(0); } }
+@keyframes cd-rise-inner { from { transform: translateY(-102%); } to { transform: translateY(0); } }
+@keyframes cd-glow { 0% { opacity: 0; } 40% { opacity: 1; } 100% { opacity: .9; } }
+@keyframes cd-ray { 0% { opacity: 0; transform: rotate(var(--a)) translateX(43cqi) scaleX(0); } 25% { opacity: .85; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(50cqi) scaleX(1); } }
+@keyframes cd-spark { 0% { opacity: 0; transform: rotate(var(--a)) translateX(40cqi) scale(.4); } 14% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(calc(40cqi + var(--r))) scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-page *, .cd-page *::before, .cd-page *::after { animation: none !important; transition: none !important; }
+  .cd-year[data-igniting] .cd-seven-fill, .cd-year[data-igniting] .cd-seven-fill > span { transform: none; }
+  .cd-year[data-igniting] .cd-year-seven::before { opacity: .9; }
+  .cd-page[data-celebration] .is-bloom { opacity: .4; }
+}

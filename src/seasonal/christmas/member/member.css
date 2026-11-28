@@ -61,6 +61,10 @@
 .xm-welcome-name { margin-top: 4px !important; font: 750 clamp(2rem, 8.4vw, 3rem)/1.02 var(--font-heading); letter-spacing: -.035em; color: #fff8ec; overflow-wrap: anywhere; }
 .xm-welcome-sub { margin-top: 6px !important; color: var(--xm-text-2); font-size: .9375rem; line-height: 1.45; }
 .xm-welcome-season { margin-top: 4px !important; font: italic 500 1.0625rem/1.35 var(--xm-serif); color: var(--xm-champagne); text-wrap: balance; }
+/* 3.7.1: the Mystery Countdown invitation, from 27 December through New Year's Day only. */
+.xm-countdown-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 2px; color: var(--xm-champagne); font-weight: 700; font-size: .875rem; text-decoration: none; }
+.xm-countdown-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.xm-countdown-link:focus-visible { outline: 2px solid var(--xm-champagne); outline-offset: 2px; border-radius: 6px; }
 .xm-welcome-gift { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0; width: 96px; }
 .xm-gift { position: relative; display: block; width: 100%; cursor: pointer; }
 .xm-gift-art { display: block; width: 100%; height: auto; overflow: visible; }

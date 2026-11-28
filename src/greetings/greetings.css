@@ -202,6 +202,9 @@
 .mg-countdown-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 2px; border-radius: 12px; background: #00000033; }
 .mg-countdown-cell b { color: var(--mg-text); font: 700 clamp(1.3rem, 6vw, 1.7rem)/1 var(--mg-display); font-variant-numeric: tabular-nums; }
 .mg-countdown-cell span { color: var(--mg-text-2); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+.mg-countdown-link { display: inline-flex; align-items: center; gap: .35em; min-height: 44px; margin-top: 6px; padding: 0 10px; border-radius: 999px; color: var(--mg-accent-2); font: 600 .88rem/1.2 var(--mg-display); text-decoration: none; }
+.mg-countdown-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.mg-countdown-link:focus-visible { outline: 2px solid var(--mg-accent); outline-offset: 2px; }
 
 /* ───────── States: loading and errors ───────── */
 .mg-state { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-top: 12vh; text-align: center; }

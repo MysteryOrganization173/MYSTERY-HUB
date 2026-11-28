@@ -1,6 +1,7 @@
 import {Router,json as jsonBody,type Request,type Response,type RequestHandler,type ErrorRequestHandler} from 'express';
 import {requireAdmin} from '../middleware/authMiddleware.js';
 import {createRateLimiter} from '../middleware/rateLimiter.js';
+import {createClockAdmission} from '../middleware/clockAdmission.js';
 import {campaignRequestEligible} from '../db/campaignStore.js';
 import {ExperienceStore,abuseIdentity} from '../db/experienceStore.js';
 import {ExperienceService,greetingCreationEnabled,greetingLinksEnabled,resetGreetingCreationAvailability} from '../services/experienceService.js';
@@ -21,9 +22,16 @@ const handle=(work:(req:Request,res:Response)=>Promise<unknown>|unknown):Request
 export const experienceRouter=Router(),adminExperienceRouter=Router();
 const privateResponse:RequestHandler=(_req,res,next)=>{res.set('Cache-Control','no-store, private').set('X-Robots-Tag','noindex, nofollow').set('X-Content-Type-Options','nosniff');next();};
 const bodyError:ErrorRequestHandler=(err,_req,res,_next)=>{res.status(err?.type==='entity.too.large'?413:400).json({error:{code:err?.type==='entity.too.large'?'BODY_TOO_LARGE':'INVALID_JSON'}});};
+/*
+ * 3.7.1: the countdown clock is a public, database-free read of the server's time (the Mystery Countdown page and the
+ * card under New Year greetings). It keeps its own admission, registered ahead of the shared budget, so a busy New
+ * Year's Eve cannot exhaust the Greetings budget and Greetings traffic cannot stall the clock. Bounded per visitor
+ * network and for the whole process; unqualified ingress (one shared key) is held to the process ceiling.
+ */
+export const COUNTDOWN_READS_PER_VISITOR=1200,COUNTDOWN_READS_TOTAL=12000;
+experienceRouter.get('/countdown',privateResponse,createClockAdmission({perVisitor:COUNTDOWN_READS_PER_VISITOR,total:COUNTDOWN_READS_TOTAL,identify:greetingVisitor}),handle(()=>countdownState()));
 experienceRouter.use(privateResponse,createRateLimiter({windowMs:60000,max:240,key:visitorRateKey,enforceInTests:true}),jsonBody({limit:'8kb'}),bodyError);
 experienceRouter.get('/state',handle(()=>ExperienceService.state()));
-experienceRouter.get('/countdown',handle(()=>countdownState()));
 experienceRouter.get('/templates',handle(req=>{
  if(Object.keys(req.query).some(k=>!['occasion','random'].includes(k))||req.query.random!==undefined&&(typeof req.query.random!=='string'||!['true','false'].includes(req.query.random)))throw new ExperienceError('INVALID_QUERY');
  return ExperienceService.templates(req.query.occasion,req.query.random==='true',greetingVisitor(req).established);
