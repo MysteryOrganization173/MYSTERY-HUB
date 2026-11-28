@@ -7,7 +7,7 @@
  * synthetic answers, and "Continue to payment" only shows a fixture notice. A banner on every screen says so.
  *
  *   ?view=recipient&status=pending|delivered|review|undeliverable|status_unavailable&sender=Kojo&occasion=new-year-2027&variant=gift-starlight-v1
- *   ?view=choice   ?view=picker   ?view=review&quote=ready|changed|checking|failed   ?view=empty   ?view=failed
+ *   ?view=choice   ?view=picker   ?view=review&quote=ready|changed|discount|checking|failed   ?view=empty   ?view=failed
  */
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -18,7 +18,7 @@ import { GreetingStage } from '../../src/greetings/GreetingStage';
 import { GreetingsSky, GreetingsTopBar, useGreetingsFonts } from '../../src/greetings/chrome';
 import type { Occasion, Variant } from '../../src/greetings/model';
 import { GiftReveal } from '../../src/greetings/gifts/GiftReveal';
-import { GiftChoice, GiftPicker, giftProductsFromCatalogue, type GiftMode, type GiftQuote, type GiftSelection } from '../../src/greetings/gifts/GiftSender';
+import { GiftChoice, GiftPicker, cedis, giftProductsFromCatalogue, giftQuoteFromServer, type GiftMode, type GiftQuote, type GiftSelection } from '../../src/greetings/gifts/GiftSender';
 import { GIFT_STATUSES, type GiftStatus } from '../../shared/mysteryGifts';
 
 const q = new URLSearchParams(location.search);
@@ -70,7 +70,7 @@ function Recipient() {
         greeting={{ occasion, variant, recipientName: 'Ama', senderName: sender, message: occasion === 'new-year-2027' ? 'Wishing you a peaceful beginning and a year filled with possibility.' : 'May your Christmas be filled with warmth, peace and little moments of joy.' }}
         after={() => (
           <>
-            <GiftReveal key={shown} gift={{ schemaVersion: 1, kind: 'data', network: q.get('network') === 'telecel' ? 'telecel' : q.get('network') === 'airteltigo' ? 'airteltigo' : 'mtn', allowance: q.get('allowance') || '5GB', status: shown }}
+            <GiftReveal gift={{ schemaVersion: 1, kind: 'data', network: q.get('network') === 'telecel' ? 'telecel' : q.get('network') === 'airteltigo' ? 'airteltigo' : 'mtn', allowance: q.get('allowance') || '5GB', status: shown }}
               senderName={sender} initiallyOpen={attempt > 0} onRetry={() => setAttempt(a => a + 1)} />
             <div className="mg-actions" data-single>
               <button type="button" className="mg-btn mg-btn-quiet">Replay the surprise</button>
@@ -102,25 +102,29 @@ function Choice() {
 }
 
 function Picker({ stage = 'choose', quoteMode = 'ready' }: { stage?: 'choose' | 'review'; quoteMode?: string }) {
-  const [quote, setQuote] = useState<GiftQuote | null>(stage === 'review' ? quoteFor(quoteMode, 2700) : null);
+  const [quote, setQuote] = useState<GiftQuote | null>(stage === 'review' ? quoteFor(quoteMode, 'fixture-mtn-5', 2700) : null);
   const [notice, setNotice] = useState('');
   const review = (s: GiftSelection) => {
     setQuote({ state: 'checking' });
     const p = PRODUCTS.find(x => x.id === s.productId)!;
-    setTimeout(() => setQuote(quoteFor(quoteMode, p.priceMinor)), 500);
+    setTimeout(() => setQuote(quoteFor(quoteMode, p.id, p.priceMinor)), 500);
   };
   return (
     <Page>
       <GiftPicker products={PRODUCTS} quote={quote} senderHidden={q.get('hidden') === '1'} onReview={review}
-        onContinue={s => setNotice(`Fixture: ${s.productId} for ${s.recipient} would go to the existing Mystery Hub Data checkout. Nothing is connected here.`)}
+        onContinue={c => setNotice(`Fixture: ${c.productId} for ${c.recipient} at ${cedis(c.expectedTotalMinor)} would go to the existing Mystery Hub Data checkout. Nothing is connected here.`)}
         onSkip={() => setNotice('Fixture: back to the free greeting.')}
         initial={stage === 'review' ? { network: 'mtn', productId: 'fixture-mtn-5', number: '024 555 0187', confirm: '024 555 0187', stage: 'review' } : undefined} />
       {notice && <Notice>{notice}</Notice>}
     </Page>
   );
 }
-function quoteFor(mode: string, priceMinor: number): GiftQuote {
-  return mode === 'checking' ? { state: 'checking' } : mode === 'failed' ? { state: 'failed' } : { state: 'ready', totalMinor: mode === 'changed' ? priceMinor + 100 : priceMinor };
+/** A synthetic answer in the GET /api/commercial/quote/:productId shape, read through the same adapter a real one would be. */
+function quoteFor(mode: string, productId: string, priceMinor: number): GiftQuote {
+  if (mode === 'checking') return { state: 'checking' };
+  if (mode === 'failed') return { state: 'failed' };
+  const regularMinor = mode === 'changed' ? priceMinor + 100 : priceMinor, discountMinor = mode === 'discount' ? 100 : 0;
+  return giftQuoteFromServer(productId, { product: { id: productId }, regularMinor, discountMinor, totalMinor: regularMinor - discountMinor, pricingRevision: 'fixture-pricing', promotionRevision: 'fixture-promotion' });
 }
 
 function Empty({ failed }: { failed: boolean }) {

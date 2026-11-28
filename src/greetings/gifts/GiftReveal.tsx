@@ -20,14 +20,18 @@ export const GIFT_NETWORK_COPY: Record<GiftNetwork, { name: string; color: strin
 };
 
 export interface GiftStatusCopy { title: string; detail: string }
-/** Recipient wording for each status. Never asks the recipient to act, and never discusses money. */
+/**
+ * Recipient wording for each status. Never asks the recipient to act, and never discusses money. A greeting knows no
+ * phone number: the bundle went to whatever number the sender entered, and links get forwarded. So the wording never
+ * says "your number"; it says "the number your sender chose".
+ */
 export function giftStatusCopy(status: GiftStatus, network: GiftNetwork): GiftStatusCopy {
   const name = GIFT_NETWORK_COPY[network].name;
   switch (status) {
-    case 'delivered': return { title: 'Delivered', detail: `The bundle has been delivered to your number. You can check your data balance with ${name}.` };
-    case 'pending': return { title: 'On its way', detail: 'Delivery to your number is in progress. Networks sometimes take a little while.' };
+    case 'delivered': return { title: 'Delivered', detail: `The bundle has been delivered to the number your sender chose. You can check your data balance with ${name}.` };
+    case 'pending': return { title: 'On its way', detail: 'Delivery to the number your sender chose is in progress. Networks sometimes take a little while.' };
     case 'review': return { title: 'Being checked', detail: 'Its delivery is being checked. There’s nothing you need to do.' };
-    case 'undeliverable': return { title: 'Couldn’t be delivered', detail: 'This bundle couldn’t be delivered to your number. Mystery Hub will look after it with your sender. There’s nothing you need to do.' };
+    case 'undeliverable': return { title: 'Couldn’t be delivered', detail: 'This bundle couldn’t be delivered to the number your sender chose. Mystery Hub handles this directly with your sender, so there’s nothing you need to do.' };
     case 'status_unavailable': return { title: 'Status unavailable', detail: 'We couldn’t check this gift’s delivery just now. Please try again in a moment.' };
   }
 }
@@ -44,15 +48,19 @@ const ICONS: Record<GiftStatus, typeof Check> = { delivered: Check, pending: Clo
 
 /**
  * The tag opens with one tap (or Enter/Space); focus then moves to the card's heading so screen readers hear the gift.
- * Without motion it simply appears. `initiallyOpen` is for previews and review screens only.
+ * Without motion it simply appears. After "Check again", the button goes away once a status arrives, so focus moves to
+ * the new status rather than dropping to the page. `initiallyOpen` is for previews and review screens only.
+ * `headingLevel` follows the page's outline, as GreetingStage's does.
  */
-export function GiftReveal({ gift, senderName, onRetry, initiallyOpen = false, onOpen }: {
-  gift: PublicGreetingGift; senderName: string | null; onRetry?: () => void; initiallyOpen?: boolean; onOpen?: () => void;
+export function GiftReveal({ gift, senderName, onRetry, initiallyOpen = false, onOpen, headingLevel = 2 }: {
+  gift: PublicGreetingGift; senderName: string | null; onRetry?: () => void; initiallyOpen?: boolean; onOpen?: () => void; headingLevel?: 2 | 3;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const moved = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null), statusLine = useRef<HTMLDivElement>(null);
+  const moved = useRef(false), retried = useRef(false);
   useLayoutEffect(() => { if (open && moved.current) { heading.current?.focus({ preventScroll: true }); moved.current = false; } }, [open]);
+  useLayoutEffect(() => { if (retried.current && gift.status !== 'status_unavailable') { statusLine.current?.focus({ preventScroll: true }); retried.current = false; } }, [gift.status]);
+  const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const net = GIFT_NETWORK_COPY[gift.network];
   const copy = giftStatusCopy(gift.status, gift.network);
   const Icon = ICONS[gift.status];
@@ -75,18 +83,18 @@ export function GiftReveal({ gift, senderName, onRetry, initiallyOpen = false, o
             <p className="mgg-kind">A little extra surprise</p>
             <span className="mgg-net"><span className="mgg-net-dot" aria-hidden="true" />{net.name}</span>
           </div>
-          <h2 ref={heading} tabIndex={-1} className="mgg-allowance">
+          <Heading ref={heading} tabIndex={-1} className="mgg-allowance">
             <span className="mgg-allowance-value">{gift.allowance}</span>{' '}
             <span className="mgg-allowance-label">Data Gift</span>
-          </h2>
+          </Heading>
           <p className="mgg-from">{giftFromLine(gift.status, senderName)}</p>
           <div className="mgg-tear" aria-hidden="true" />
-          <div className="mgg-status" data-status={gift.status} role="status">
+          <div ref={statusLine} tabIndex={-1} className="mgg-status" data-status={gift.status} role="status">
             <span className="mgg-status-icon" aria-hidden="true"><Icon /></span>
             <p><strong className="mgg-status-title">{copy.title}</strong> <span className="mgg-status-detail">{copy.detail}</span></p>
           </div>
           {gift.status === 'status_unavailable' && onRetry && (
-            <button type="button" className="mg-btn mg-btn-quiet mgg-retry" onClick={onRetry}><RefreshCw className="mg-icon" aria-hidden="true" />Check again</button>
+            <button type="button" className="mg-btn mg-btn-quiet mgg-retry" onClick={() => { retried.current = true; onRetry(); }}><RefreshCw className="mg-icon" aria-hidden="true" />Check again</button>
           )}
         </article>
       )}

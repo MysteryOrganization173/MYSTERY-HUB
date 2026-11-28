@@ -96,7 +96,7 @@ async function openLetter(page) {
     const t = await card.innerText();
     assert(/5GB/.test(t) && /Data Gift/.test(t) && /MTN/.test(t), t);
     assert((/^Delivered$/m.test(t)) === (status === 'delivered'), `"Delivered" only when delivered: ${t}`);
-    assert(!/GH₵|refund|payment|paystack|reference|\d{4}/i.test(t), `private or financial detail: ${t}`);
+    assert(!/GH₵|refund|payment|paystack|reference|\d{4}|\d{3}\s*[X*•]|your number/i.test(t), `private, financial or unknowable detail: ${t}`);
     assert(sender ? /Kojo/.test(t) : /Your mystery sender/.test(t), `sender line: ${t}`);
     await page.waitForTimeout(700);
     await card.evaluate(el => el.scrollIntoView({ block: 'end' }));
@@ -105,6 +105,7 @@ async function openLetter(page) {
     if (status === 'status_unavailable') {
       await page.getByRole('button', { name: /check again/i }).click();
       await page.locator('.mgg-card[data-status="pending"]').waitFor();
+      assert(await focused(page, () => document.activeElement?.classList.contains('mgg-status')), 'after Check again, focus lands on the new status, not the page');
     }
     clean(page); await noOverflow(page); await axe(page, status);
     await page.context().close();
@@ -173,6 +174,7 @@ async function openLetter(page) {
     // Nothing chosen: errors, and focus goes to the first problem.
     await page.getByRole('button', { name: /review gift/i }).click();
     assert(await focused(page, () => document.activeElement?.id === 'mgg-field-product'), 'focus on the bundle choice');
+    assert(await page.locator('#mgg-field-product').evaluate(el => getComputedStyle(el).outlineStyle !== 'none'), 'the focused bundle group shows its focus');
     assert(await page.getByText('Choose a bundle.').isVisible(), 'bundle error');
     await page.locator('.mgg-net-option', { hasText: 'Telecel' }).click();
     const tel = await page.locator('.mgg-bundles').innerText();
@@ -196,15 +198,27 @@ async function openLetter(page) {
     await page.getByRole('button', { name: /change gift/i }).click();
     assert(await page.getByRole('radio', { name: /5GB/ }).isChecked(), 'the selection is kept');
     assert(await page.getByLabel('Their mobile number').inputValue() === '024 555 0187', 'the number is kept');
+    // A network switch drops a bundle chosen on another network; checkout then gets exactly what was reviewed.
+    await page.locator('.mgg-net-option', { hasText: 'Telecel' }).click();
+    await page.locator('.mgg-net-option', { hasText: 'MTN' }).click();
+    assert(!(await page.getByRole('radio', { name: /5GB/ }).isChecked()), 'switching network clears the bundle');
+    await page.locator('.mgg-bundle', { hasText: '10GB' }).click();
+    await page.getByRole('button', { name: /review gift/i }).click();
+    await page.getByText('GH₵52.00').waitFor();
+    await page.getByRole('button', { name: /continue to payment/i }).click();
+    const handed = await page.locator('[data-fixture-notice]').innerText();
+    assert(/^Fixture: fixture-mtn-10 for 0245550187 at GH₵52\.00 would go/.test(handed), `checkout gets the reviewed bundle, number and price: ${handed}`);
     clean(page); await noOverflow(page); await axe(page, 'picker');
     await page.context().close();
   });
 
-  for (const [quote, name] of [['ready', '09-sender-review-390.jpg'], ['changed', '10-sender-review-price-changed-390.jpg']]) await check(`sender: review (${quote})`, async () => {
+  for (const [quote, name] of [['ready', '09-sender-review-390.jpg'], ['changed', '10-sender-review-price-changed-390.jpg'], ['discount', '10-sender-review-welcome-offer-390.jpg']]) await check(`sender: review (${quote})`, async () => {
     const page = await open(`view=review&quote=${quote}&hidden=1`, { scale: 2 });
     const t = await page.locator('.mgg-picker').innerText();
-    assert(/Total\s+GH₵2[78]\.00/.test(t), t);
-    assert((quote === 'changed') === /price has changed/.test(t), 'price change note');
+    assert(new RegExp(`Total\\s+GH₵${{ ready: '27.00', changed: '28.00', discount: '26.00' }[quote].replace('.', '\\.')}`).test(t), t);
+    assert((quote === 'changed') === /price has changed/.test(t), 'price change note only for a real change');
+    assert((quote === 'discount') === /welcome offer\s+−GH₵1\.00/i.test(t), 'the welcome offer is shown as itself');
+    assert(/Mystery Hub won’t text them about your order/.test(t) && /won’t cancel or refund the bundle/.test(t), 'sender notes');
     assert(/name stays hidden/.test(t), 'anonymity note');
     await page.getByRole('button', { name: /continue to payment/i }).click();
     assert(/Nothing is connected here/.test(await page.locator('[data-fixture-notice]').innerText()), 'fixture notice only');

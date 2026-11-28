@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { buildSync, transformSync } from 'esbuild';
 import {
   giftStatus, publicGift, readPublicGift, unavailableGift, GIFT_ALLOWANCE, GIFT_NETWORKS, GIFT_STATUSES, PUBLIC_GIFT_KEYS,
   type GiftCustomerResolution, type GiftStatus, type PublicGreetingGift,
@@ -14,7 +15,10 @@ import { AUTHORITATIVE_PRODUCTS } from '../../data/productCatalog.js';
 import { dataOrderPresentation } from '../../../src/utils/dataPurchasePresentation.js';
 import { customerOrderStatus } from '../../../src/utils/customerOrderPresentation.js';
 import { GiftReveal, giftFromLine, giftStatusCopy, GIFT_NETWORK_COPY } from '../../../src/greetings/gifts/GiftReveal.js';
-import { GiftChoice, GiftPicker, cedis, giftProblems, giftProductsFromCatalogue, type GiftProduct } from '../../../src/greetings/gifts/GiftSender.js';
+import {
+  GiftChoice, GiftPicker, cedis, giftCheckout, giftProblems, giftProductsFromCatalogue, giftQuoteFromServer, giftSelection, shownGiftNetwork,
+  type GiftProduct, type GiftQuote,
+} from '../../../src/greetings/gifts/GiftSender.js';
 import { DATA_NETWORK_CHOICES } from '../../../src/components/data/DataNetworkSelector.js';
 
 /* Mystery Gifts V1 (3.7.2): the dormant public gift contract, its derivation from the existing order model, and the
@@ -22,7 +26,8 @@ import { DATA_NETWORK_CHOICES } from '../../../src/components/data/DataNetworkSe
 
 const root = path.resolve(import.meta.dirname, '../../..');
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
-const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+// Source without its comments, by esbuild's own parser (strings stay intact, unlike a regex comment stripper).
+const code = (file: string) => transformSync(read(file), { loader: file.endsWith('x') ? 'tsx' : 'ts', jsx: 'preserve', legalComments: 'none', tsconfigRaw: { compilerOptions: { verbatimModuleSyntax: true } } }).code;
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const render = (el: React.ReactElement) => renderToStaticMarkup(el);
 const h = React.createElement;
@@ -155,7 +160,7 @@ test('the browser reader refuses anything unexpected, including one extra field'
   assert.deepEqual(readPublicGift(good), good);
   for (const status of GIFT_STATUSES) assert.equal(readPublicGift({ ...good, status })?.status, status);
   for (const bad of [null, undefined, 'gift', 5, [good], { ...good, amount: 4321 }, { ...good, reference: 'MH-1' }, { ...good, recipient: '******0187' },
-    { ...good, schemaVersion: 2 }, { ...good, kind: 'airtime' }, { ...good, network: 'glo' }, { ...good, allowance: '10 GB' }, { ...good, status: 'paid' },
+    { ...good, schemaVersion: 2 }, { ...good, schemaVersion: '1' }, { ...good, kind: 'Data' }, { ...good, kind: 'airtime' }, { ...good, network: 'glo' }, { ...good, allowance: '10 GB' }, { ...good, status: 'paid' },
     { schemaVersion: 1, kind: 'data', network: 'mtn', allowance: '5GB' }]) assert.equal(readPublicGift(bad), null, JSON.stringify(bad));
 });
 
@@ -185,9 +190,26 @@ test('the gift stays wrapped until the recipient opens it, then names the gift a
     // "Delivered" as a status only for a confirmed delivery; the success colour likewise.
     assert.equal(/class="mgg-status-title">Delivered</.test(html), status === 'delivered', status);
     assert.equal(/Check again/.test(t), status === 'status_unavailable', status);
-    // No money, references, numbers or dates; never asks the recipient to act on a payment.
-    assert.doesNotMatch(t, /GH₵|cedi|refund|payment|paystack|reference|\b0\d{2}\b|\d{4}|receipt/i, `${status}: ${t}`);
+    // No money, references, numbers (whole or masked) or dates; never asks the recipient to act on a payment.
+    assert.doesNotMatch(t, /GH₵|cedi|refund|payment|paystack|reference|\b0\d{2}|\d{4}|\d{3}\s*[X*•]|[X*•]{3}|receipt/i, `${status}: ${t}`);
+    // A greeting knows no phone number, and links get forwarded: never "your number", never a task for the recipient.
+    assert.doesNotMatch(t, /your number|contact|support|whatsapp|call us|ask your sender|reply/i, `${status}: ${t}`);
   }
+});
+
+test('the recipient wording for every status is the reviewed copy, word for word', () => {
+  assert.deepEqual(Object.fromEntries(GIFT_STATUSES.map(s => [s, giftStatusCopy(s, 'telecel')])), {
+    pending: { title: 'On its way', detail: 'Delivery to the number your sender chose is in progress. Networks sometimes take a little while.' },
+    delivered: { title: 'Delivered', detail: 'The bundle has been delivered to the number your sender chose. You can check your data balance with Telecel.' },
+    review: { title: 'Being checked', detail: 'Its delivery is being checked. There’s nothing you need to do.' },
+    undeliverable: { title: 'Couldn’t be delivered', detail: 'This bundle couldn’t be delivered to the number your sender chose. Mystery Hub handles this directly with your sender, so there’s nothing you need to do.' },
+    status_unavailable: { title: 'Status unavailable', detail: 'We couldn’t check this gift’s delivery just now. Please try again in a moment.' },
+  });
+  // The heading follows the page outline, like GreetingStage, and is the focus target after opening.
+  assert.match(render(h(GiftReveal, { gift: gift('pending'), senderName: null, initiallyOpen: true })), /<h2 tabindex="-1" class="mgg-allowance">/);
+  assert.match(render(h(GiftReveal, { gift: gift('pending'), senderName: null, initiallyOpen: true, headingLevel: 3 })), /<h3 tabindex="-1" class="mgg-allowance">/);
+  // The status can take focus after "Check again", so focus never drops to the page.
+  assert.match(render(h(GiftReveal, { gift: gift('pending'), senderName: null, initiallyOpen: true })), /<div tabindex="-1" class="mgg-status" data-status="pending" role="status">/);
 });
 
 test('a hidden sender stays a mystery, a named sender is named, and an undeliverable gift is described as chosen', () => {
@@ -238,7 +260,7 @@ test('the gift choice appears only when gifting is available, with the free gree
   const t = text(html);
   assert.match(t, /Make your surprise extra special/);
   assert.match(t, /Send a free greeting.*Always free/);
-  assert.match(t, /Attach a data gift.*normal price/);
+  assert.match(t, /Attach a data gift.*The greeting stays free; you pay only for the bundle\./);
   assert.match(html, /name="mgg-mode" checked="" value="free"/);
   assert.doesNotMatch(html, /checked="" value="gift"/);
 });
@@ -272,55 +294,114 @@ test('the number is checked twice before review', () => {
   assert.deepEqual(giftProblems('mtn-5gb', '+233 24 555 0187', '0245550187'), {});
 });
 
-test('review waits for the server’s price, says when it changed, and keeps money facts out of the greeting', () => {
-  const at = (quote: Parameters<typeof GiftPicker>[0]['quote'], senderHidden = false) => render(h(GiftPicker, { products, quote, senderHidden, onReview: noop, onContinue: noop, onSkip: noop,
+const serverQuote = (productId: string, regularMinor: number, discountMinor = 0, extra: Record<string, unknown> = {}) =>
+  ({ product: { id: productId }, regularMinor, discountMinor, totalMinor: regularMinor - discountMinor, pricingRevision: 'p-1', promotionRevision: 'w-1', offer: { enabled: true }, ...extra });
+
+test('a quote is read for one bundle only, and only when it adds up', () => {
+  assert.deepEqual(giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399, 100)),
+    { state: 'ready', productId: 'mtn-5gb', regularMinor: 2399, discountMinor: 100, totalMinor: 2299, pricingRevision: 'p-1', promotionRevision: 'w-1' });
+  assert.equal((giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399, 0, { standardMinor: 2700 })) as { standardMinor?: number }).standardMinor, 2700);
+  for (const bad of [null, 'x', {}, serverQuote('mtn-10gb', 2399), { ...serverQuote('mtn-5gb', 2399), totalMinor: 2000 }, serverQuote('mtn-5gb', 2399, 2399),
+    { ...serverQuote('mtn-5gb', 2399), regularMinor: 23.99, totalMinor: 23.99 }, { ...serverQuote('mtn-5gb', 2399), pricingRevision: '' }, { ...serverQuote('mtn-5gb', 2399), promotionRevision: 7 },
+    { ...serverQuote('mtn-5gb', 2399), discountMinor: -1, totalMinor: 2400 }, serverQuote('mtn-5gb', 2399, 0, { standardMinor: '27' })])
+    assert.deepEqual(giftQuoteFromServer('mtn-5gb', bad), { state: 'failed' }, JSON.stringify(bad));
+});
+
+test('what reaches checkout is exactly the reviewed bundle, the reviewed number and the server’s own amounts', () => {
+  assert.equal(shownGiftNetwork(products, null), 'mtn');
+  assert.equal(shownGiftNetwork(products, 'telecel'), 'telecel');
+  assert.equal(shownGiftNetwork(products, 'airteltigo'), 'mtn', 'a network with no bundle falls back');
+  assert.equal(shownGiftNetwork([], null), null);
+  assert.deepEqual(giftSelection(products, 'mtn', 'mtn-5gb', '024 555 0187'), { productId: 'mtn-5gb', recipient: '0245550187' });
+  assert.deepEqual(giftSelection(products, 'mtn', 'mtn-5gb', '+233 24 555 0187'), { productId: 'mtn-5gb', recipient: '0245550187' });
+  assert.equal(giftSelection(products, 'telecel', 'mtn-5gb', '024 555 0187'), null, 'a bundle kept from another network is never sent');
+  assert.equal(giftSelection(products, 'mtn', 'nope', '024 555 0187'), null);
+  assert.equal(giftSelection(products, 'mtn', null, '024 555 0187'), null);
+  assert.equal(giftSelection(products, 'mtn', 'mtn-5gb', '024 555 018'), null, 'an incomplete number is never sent');
+  const selection = giftSelection(products, 'mtn', 'mtn-5gb', '024 555 0187');
+  const ready = giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399, 100));
+  assert.deepEqual(giftCheckout(selection, ready),
+    { productId: 'mtn-5gb', recipient: '0245550187', expectedTotalMinor: 2299, expectedRegularMinor: 2399, pricingRevision: 'p-1', promotionRevision: 'w-1' });
+  assert.equal(giftCheckout(selection, giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399, 0, { standardMinor: 2700 })))?.expectedStandardMinor, 2700);
+  assert.equal(giftCheckout(selection, giftQuoteFromServer('mtn-10gb', serverQuote('mtn-10gb', 4590))), null, 'a quote for another bundle never pays for this one');
+  for (const quote of [null, { state: 'checking' }, { state: 'failed' }] as (GiftQuote | null)[]) assert.equal(giftCheckout(selection, quote), null);
+  assert.equal(giftCheckout(null, ready), null);
+});
+
+test('review waits for this bundle’s server price, tells a discount from a price change, and keeps money facts out of the greeting', () => {
+  const at = (quote: GiftQuote | null, senderHidden = false) => render(h(GiftPicker, { products, quote, senderHidden, onReview: noop, onContinue: noop, onSkip: noop,
     initial: { network: 'mtn', productId: 'mtn-5gb', number: '024 555 0187', confirm: '024 555 0187', stage: 'review' } }));
+  const disabled = /<button type="button" class="mg-btn mg-btn-primary" disabled="">Continue to payment/;
   const checking = at({ state: 'checking' });
   assert.match(text(checking), /Review your gift MTN 5GB data For 024 555 0187 Checking today’s price/);
-  assert.match(checking, /<button type="button" class="mg-btn mg-btn-primary" disabled="">Continue to payment/);
+  assert.match(checking, disabled);
   assert.doesNotMatch(text(checking), /GH₵/, 'no total before the server answers');
-  const ready = at({ state: 'ready', totalMinor: 2399 });
+  const stale = at(giftQuoteFromServer('mtn-10gb', serverQuote('mtn-10gb', 4590)));
+  assert.match(text(stale), /Checking today’s price/, 'a leftover quote for another bundle is not this bundle’s price');
+  assert.doesNotMatch(text(stale), /GH₵45\.90/);
+  assert.match(stale, disabled);
+  const ready = at(giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399)));
   assert.match(text(ready), /Total GH₵23\.99 The greeting stays free/);
-  assert.doesNotMatch(text(ready), /price has changed/);
-  assert.doesNotMatch(ready, /disabled="">Continue to payment/);
-  assert.match(text(ready), /network may text them when it arrives, possibly before they open your greeting/);
+  assert.doesNotMatch(text(ready), /price has changed|welcome offer/i);
+  assert.doesNotMatch(ready, disabled);
+  assert.match(text(ready), /Their network will usually text them when it arrives, which can be before they open your greeting\. Mystery Hub won’t text them about your order\./);
+  assert.match(text(ready), /Removing the greeting later won’t cancel or refund the bundle\./);
   assert.match(text(ready), /link never shows the price or their number/);
-  assert.match(text(at({ state: 'ready', totalMinor: 2499 })), /Total GH₵24\.99 The price has changed since you chose this bundle/);
+  const discounted = text(at(giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399, 100))));
+  assert.match(discounted, /Bundle GH₵23\.99 Your welcome offer −GH₵1\.00 Total GH₵22\.99 The greeting stays free/);
+  assert.doesNotMatch(discounted, /price has changed/, 'the buyer’s own welcome offer is not a price change');
+  assert.match(text(at(giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2499)))), /Total GH₵24\.99 The bundle’s price has changed since you chose it/);
   assert.match(text(at({ state: 'failed' })), /couldn’t confirm today’s price just now\. Try again/);
-  assert.match(text(at({ state: 'ready', totalMinor: 2399 }, true)), /Your name stays hidden from them\. Your receipt details stay with Mystery Hub and the payment provider/);
+  assert.match(at({ state: 'failed' }), disabled);
+  assert.match(text(at(giftQuoteFromServer('mtn-5gb', serverQuote('mtn-5gb', 2399)), true)), /Your name stays hidden from them\. Your receipt details stay with Mystery Hub and the payment provider/);
   assert.doesNotMatch(text(ready), /name stays hidden/);
+});
+
+test('an input problem is announced on the field it belongs to', () => {
+  const html = render(h(GiftPicker, { products, quote: null, onReview: noop, onContinue: noop, onSkip: noop }));
+  // The checking-twice advice is read with both number fields.
+  assert.match(html, /id="mgg-field-number"[^>]*aria-describedby="mgg-help-number"/);
+  assert.match(html, /id="mgg-field-confirm"[^>]*aria-describedby="mgg-help-number"/);
+  assert.match(html, /<p class="mg-help" id="mgg-help-number">/);
+  // The bundle group takes focus on an error, so it must show that focus.
+  assert.match(read('src/greetings/gifts/gifts.css'), /\.mgg-field-product:focus \{ outline: 3px solid/);
 });
 
 /* ───────────────────────── Isolation: dormant means unreachable ───────────────────────── */
 
-function sources(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(path.join(root, dir))) {
-    const rel = path.join(dir, name);
-    if (statSync(path.join(root, rel)).isDirectory()) { if (!['node_modules', 'dist', '__tests__'].includes(name)) sources(rel, out); }
-    else if (/\.(tsx?|css|html)$/.test(name)) out.push(rel);
-  }
-  return out;
+// Everything a production entry point can load, as esbuild's bundler resolves it: static, dynamic and index imports,
+// and the '@' alias. Packages are left out; only this repository's own files matter here.
+const ASSETS = Object.fromEntries(['.css', '.svg', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.woff', '.woff2', '.mp3', '.mp4', '.html', '.txt', '.md', '.sql'].map(e => [e, 'empty' as const]));
+function reachable(entry: string, platform: 'browser' | 'node'): string[] {
+  const result = buildSync({ entryPoints: [path.join(root, entry)], absWorkingDir: root, bundle: true, write: false, metafile: true, packages: 'external', platform,
+    format: 'esm', splitting: true, outdir: path.join(root, '.gift-reach'), loader: ASSETS, alias: { '@': root }, jsx: 'automatic', logLevel: 'silent' });
+  return Object.keys(result.metafile!.inputs);
 }
+const GIFT_FILE = /(^|\/)src\/greetings\/gifts\/|(^|\/)shared\/mysteryGifts\.ts$|giftsReview/;
 
 test('nothing in production reaches the gift components or the gift contract', () => {
-  const production = [...sources('src'), ...sources('server'), ...sources('shared'), 'server.ts', 'index.html', 'vite.config.ts'];
-  for (const file of production) {
-    if (file.startsWith(path.join('src', 'greetings', 'gifts')) || file === path.join('shared', 'mysteryGifts.ts')) continue;
-    const body = code(read(file));
-    assert.doesNotMatch(body, /greetings\/gifts|\.\/gifts\/|mysteryGifts/, `${file} must not import the dormant gift code`);
+  // A positive control first: the review fixture does reach them, so the check can see an import when there is one.
+  assert.ok(reachable('scripts/review/giftsReview.tsx', 'browser').filter(f => GIFT_FILE.test(f)).length >= 3, 'the reachability check must see the fixture’s imports');
+  for (const [entry, platform] of [['src/main.tsx', 'browser'], ['server.ts', 'node']] as const) {
+    const files = reachable(entry, platform);
+    assert.ok(files.length > 100, `${entry} was resolved`);
+    assert.deepEqual(files.filter(f => GIFT_FILE.test(f)), [], `${entry} must not load the dormant gift code`);
   }
+  // The only page is index.html, and it loads only the app.
+  assert.deepEqual([...read('index.html').matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]), ['/src/main.tsx']);
+  assert.doesNotMatch(read('vite.config.ts'), /scripts\/review|giftsReview/);
   // The live Greetings surfaces are the free ones, unchanged by this release.
   for (const file of ['src/main.tsx', 'src/greetings/CreatorPage.tsx', 'src/greetings/RecipientPage.tsx', 'src/greetings/GreetingStage.tsx', 'src/greetings/api.ts'])
-    assert.doesNotMatch(code(read(file)), /[Gg]ift(Reveal|Choice|Picker|Sender)|data gift|giftStatus/, file);
+    assert.doesNotMatch(code(file), /[Gg]ift(Reveal|Choice|Picker|Sender)|data gift|giftStatus|mysteryGifts|\/gifts/, file);
   // No contract pretends a gift exists: the public greeting has no gift field, and no server route attaches one.
   assert.doesNotMatch(read('shared/mysteryExperiences.ts').match(/interface PublicGreeting \{[^}]*\}/)![0], /gift/i);
-  assert.doesNotMatch(code(read('server/routes/experienceApi.ts')), /gift/i);
-  assert.doesNotMatch(code(read('server/routes/api.ts')), /greeting/i, 'checkout knows nothing about greetings');
+  assert.doesNotMatch(code('server/routes/experienceApi.ts'), /gift/i);
+  assert.doesNotMatch(code('server/routes/api.ts'), /greeting/i, 'checkout knows nothing about greetings');
 });
 
 test('the dormant components never call a server, start a payment or hardcode a price', () => {
   for (const file of ['src/greetings/gifts/GiftReveal.tsx', 'src/greetings/gifts/GiftSender.tsx', 'shared/mysteryGifts.ts']) {
-    const body = code(read(file));
+    const body = code(file);
     assert.doesNotMatch(body, /fetch\(|XMLHttpRequest|sendBeacon|usePaystack|PaystackPop|paystack|apiClient|commercialRequest|localStorage|sessionStorage/i, file);
     assert.doesNotMatch(body, /GH₵\s*\d|amountPesewas\s*[:=]\s*\d|priceMinor\s*[:=]\s*\d/, `${file} must not carry a price`);
   }

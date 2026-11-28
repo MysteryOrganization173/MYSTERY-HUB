@@ -38,6 +38,8 @@
 .mgg-status[data-status="pending"] .mgg-status-icon { color: var(--mg-accent-ink); background: var(--mg-foil); }
 .mgg-status p { color: var(--mg-ink-2); line-height: 1.5; font-size: .95rem; }
 .mgg-status-title { display: block; color: var(--mg-ink); font: 700 1rem/1.3 var(--mg-display); }
+.mgg-status:focus { outline: none; }
+.mgg-status:focus-visible { outline: 2px solid var(--mg-letter-accent); outline-offset: 4px; border-radius: 8px; }
 .mgg-retry { width: 100%; margin-top: 8px; color: var(--mg-ink-2); }
 .mgg-retry:hover { color: var(--mg-ink); }
 
@@ -71,7 +73,7 @@
 .mgg-bundle-size { color: var(--mg-text); font: 700 1.3rem/1.1 var(--mg-display); font-variant-numeric: tabular-nums; }
 .mgg-bundle-price { color: var(--mg-text-2); font: 600 .9rem/1.3 var(--mg-sans); font-variant-numeric: tabular-nums; }
 .mgg-bundle-validity { color: var(--mg-text-3); font-size: .76rem; }
-.mgg-field-product:focus { outline: none; }
+.mgg-field-product:focus { outline: 3px solid var(--mg-accent-2); outline-offset: 4px; border-radius: 14px; }
 .mgg-actions { margin-top: 22px; }
 
 .mgg-summary { position: relative; margin-top: 18px; padding: 16px 18px; border-radius: 18px; color: var(--mg-ink); background: linear-gradient(180deg, var(--mg-paper), var(--mg-paper-2));
@@ -83,6 +85,8 @@
 .mgg-summary-to strong { color: var(--mg-ink); }
 .mgg-price { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--mg-surface); border: 1px solid var(--mg-line); }
 .mgg-price-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--mg-text-2); font: 600 1rem/1.3 var(--mg-display); }
+.mgg-price-part { font-weight: 500; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.mgg-price-part + .mgg-price-line { margin-top: 4px; }
 .mgg-price-line strong { color: var(--mg-text); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
 .mgg-price-note { margin-top: 4px; color: var(--mg-text-2); font-size: .9rem; line-height: 1.5; }
 .mgg-price-line + .mgg-price-note { margin-top: 6px; }

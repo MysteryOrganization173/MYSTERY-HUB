@@ -12,8 +12,10 @@ import { GIFT_NETWORK_COPY } from './GiftReveal';
  *   gifting is genuinely available, and the free greeting is always the default.
  * - GiftPicker lets the creator choose a standard Data bundle from the server's own catalogue, enter the recipient's
  *   number twice and review the server-confirmed price. Every price shown comes from its props (the catalogue and a
- *   server quote), never from this file. "Continue to payment" only reports the selection to the caller, which in a
- *   future release hands it to the existing Mystery Hub Data checkout once the 3.5 contract exists.
+ *   server quote), never from this file. "Continue to payment" only reports the reviewed checkout (product, number and
+ *   the quote's expected amounts and revisions) to the caller, which in a future release hands it to the existing
+ *   Mystery Hub Data checkout once the 3.5 contract exists. What reaches checkout is built by giftSelection and
+ *   giftCheckout below, so it can be tested on its own.
  */
 
 export type GiftMode = 'free' | 'gift';
@@ -38,7 +40,7 @@ export function GiftChoice({ value, onChange, available }: { value: GiftMode; on
           <span className="mgg-option-icon" aria-hidden="true"><Gift /></span>
           <span className="mgg-option-text">
             <span className="mgg-option-title">Attach a data gift</span>
-            <span className="mgg-option-detail">Add a real data bundle for their number. You pay only the bundle’s normal price.</span>
+            <span className="mgg-option-detail">Add a real data bundle for their number. The greeting stays free; you pay only for the bundle.</span>
           </span>
         </label>
       </div>
@@ -71,9 +73,52 @@ export function giftProductsFromCatalogue(body: unknown): GiftProduct[] {
 export const cedis = (minor: number) => `GH₵${(minor / 100).toFixed(2)}`;
 
 export interface GiftSelection { productId: string; recipient: string }
-/** The server's price for the reviewed selection: asked for when the creator reviews, never assumed. */
-export type GiftQuote = { state: 'checking' } | { state: 'ready'; totalMinor: number } | { state: 'failed' };
+/**
+ * The server's price for the reviewed selection (GET /api/commercial/quote/:productId), asked for when the creator
+ * reviews and never assumed. `regularMinor` is the bundle's current price, `discountMinor` the signed-in buyer's own
+ * welcome benefit (never the recipient's), and the revisions are what POST /api/payments/initialize checks.
+ */
+export type GiftQuote =
+  | { state: 'checking' }
+  | { state: 'failed' }
+  | { state: 'ready'; productId: string; regularMinor: number; discountMinor: number; totalMinor: number; standardMinor?: number; pricingRevision: string; promotionRevision: string };
+/** Everything the existing Data checkout needs from the gift step (the integration adds its own requestId). */
+export interface GiftCheckout {
+  productId: string; recipient: string;
+  expectedTotalMinor: number; expectedRegularMinor: number; expectedStandardMinor?: number; pricingRevision: string; promotionRevision: string;
+}
 type Problems = Partial<Record<'product' | 'number' | 'confirm', string>>;
+
+const minor = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+const revision = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200;
+/** Reads a quote answer for one product. Anything for another product, or that doesn't add up, is a failed quote. */
+export function giftQuoteFromServer(productId: string, body: unknown): GiftQuote {
+  const q = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const product = q.product as { id?: unknown } | undefined;
+  const ok = product?.id === productId && minor(q.regularMinor) && minor(q.discountMinor) && minor(q.totalMinor) && q.totalMinor > 0
+    && q.totalMinor === q.regularMinor - q.discountMinor && revision(q.pricingRevision) && revision(q.promotionRevision)
+    && (q.standardMinor === undefined || minor(q.standardMinor));
+  if (!ok) return { state: 'failed' };
+  return { state: 'ready', productId, regularMinor: q.regularMinor as number, discountMinor: q.discountMinor as number, totalMinor: q.totalMinor as number,
+    ...(q.standardMinor !== undefined ? { standardMinor: q.standardMinor as number } : {}), pricingRevision: q.pricingRevision as string, promotionRevision: q.promotionRevision as string };
+}
+
+/** The network on show: the creator's choice while it still has bundles, otherwise the first one that does. */
+export function shownGiftNetwork(products: GiftProduct[], chosen: GiftNetwork | null): GiftNetwork | null {
+  const networks = GIFT_NETWORKS.filter(n => products.some(p => p.network === n));
+  return chosen && networks.includes(chosen) ? chosen : networks[0] ?? null;
+}
+/** The reviewed selection: only a bundle of the network on show, and only a complete number, as its 10 digits. */
+export function giftSelection(products: GiftProduct[], network: GiftNetwork | null, productId: string | null, number: string): GiftSelection | null {
+  const product = products.find(p => p.id === productId && p.network === network);
+  return product && isCompleteGhanaPhone(number) ? { productId: product.id, recipient: ghanaPhoneDigits(number) } : null;
+}
+/** What "Continue to payment" hands to checkout: only with a ready quote for this very bundle. */
+export function giftCheckout(selection: GiftSelection | null, quote: GiftQuote | null): GiftCheckout | null {
+  if (!selection || quote?.state !== 'ready' || quote.productId !== selection.productId) return null;
+  return { productId: selection.productId, recipient: selection.recipient, expectedTotalMinor: quote.totalMinor, expectedRegularMinor: quote.regularMinor,
+    ...(quote.standardMinor !== undefined ? { expectedStandardMinor: quote.standardMinor } : {}), pricingRevision: quote.pricingRevision, promotionRevision: quote.promotionRevision };
+}
 
 export function giftProblems(productId: string | null, number: string, confirm: string): Problems {
   const problems: Problems = {};
@@ -88,7 +133,7 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
   quote: GiftQuote | null;
   senderHidden?: boolean;
   onReview: (selection: GiftSelection) => void;
-  onContinue: (selection: GiftSelection) => void;
+  onContinue: (checkout: GiftCheckout) => void;
   onSkip: () => void;
   onRetryCatalogue?: () => void;
   /** Review screens and previews only. */
@@ -97,7 +142,7 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
   const list = Array.isArray(products) ? products : [];
   const networks = useMemo(() => GIFT_NETWORKS.filter(n => list.some(p => p.network === n)), [list]);
   const [network, setNetwork] = useState<GiftNetwork | null>(initial?.network ?? null);
-  const shownNetwork = network && networks.includes(network) ? network : networks[0] ?? null;
+  const shownNetwork = shownGiftNetwork(list, network);
   const [productId, setProductId] = useState<string | null>(initial?.productId ?? null);
   const [number, setNumber] = useState(initial?.number ?? '');
   const [confirm, setConfirm] = useState(initial?.confirm ?? '');
@@ -106,7 +151,7 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
   const heading = useRef<HTMLHeadingElement>(null), moved = useRef(false);
   useLayoutEffect(() => { if (moved.current) { heading.current?.focus({ preventScroll: true }); moved.current = false; } }, [stage]);
   const product = list.find(p => p.id === productId && p.network === shownNetwork) ?? null;
-  const selection = (): GiftSelection | null => product ? { productId: product.id, recipient: ghanaPhoneDigits(number) } : null;
+  const selection = () => giftSelection(list, shownNetwork, productId, number);
 
   if (products === 'loading') return <section className="mgg-picker"><div className="mg-state mg-loading" role="status"><span className="mg-loading-gift" aria-hidden="true"><span /><span /></span><p>Finding today’s data bundles…</p></div></section>;
   if (products === 'failed' || !list.length) {
@@ -133,7 +178,10 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
 
   if (stage === 'review' && product) {
     const net = GIFT_NETWORK_COPY[product.network];
-    const changed = quote?.state === 'ready' && quote.totalMinor !== product.priceMinor;
+    // A quote for a bundle that is no longer under review is stale: wait for this bundle's own price.
+    const ready = quote?.state === 'ready' && quote.productId === product.id ? quote : null;
+    const changed = !!ready && ready.regularMinor !== product.priceMinor;
+    const checkout = giftCheckout(selection(), ready);
     return (
       <section className="mgg-picker" aria-labelledby="mgg-review-title">
         <h1 id="mgg-review-title" ref={heading} tabIndex={-1} className="mgg-title">Review your gift</h1>
@@ -143,10 +191,14 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
           <p className="mgg-summary-to">For <strong>{formatGhanaPhone(number)}</strong></p>
         </div>
         <div className="mgg-price" role="status" aria-live="polite">
-          {quote?.state === 'ready' ? (
+          {ready ? (
             <>
-              <p className="mgg-price-line"><span>Total</span> <strong>{cedis(quote.totalMinor)}</strong></p>
-              {changed && <p className="mgg-price-note">The price has changed since you chose this bundle. This is the current price.</p>}
+              {ready.discountMinor > 0 && <>
+                <p className="mgg-price-line mgg-price-part"><span>Bundle</span> <span>{cedis(ready.regularMinor)}</span></p>
+                <p className="mgg-price-line mgg-price-part"><span>Your welcome offer</span> <span>−{cedis(ready.discountMinor)}</span></p>
+              </>}
+              <p className="mgg-price-line"><span>Total</span> <strong>{cedis(ready.totalMinor)}</strong></p>
+              {changed && <p className="mgg-price-note">The bundle’s price has changed since you chose it. This is the current price.</p>}
               <p className="mgg-price-note">The greeting stays free. You pay only for the bundle, at its current Mystery Hub price.</p>
             </>
           ) : quote?.state === 'failed' ? (
@@ -154,13 +206,14 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
           ) : <p className="mgg-price-note">Checking today’s price…</p>}
         </div>
         <ul className="mgg-notes">
-          <li>The bundle goes straight to this number. Their network may text them when it arrives, possibly before they open your greeting.</li>
+          <li>The bundle goes straight to this number. Their network will usually text them when it arrives, which can be before they open your greeting. Mystery Hub won’t text them about your order.</li>
           <li>Payment uses Mystery Hub’s usual secure checkout, with the usual receipt and order tracking.</li>
           <li>Your greeting link never shows the price or their number.</li>
+          <li>Removing the greeting later won’t cancel or refund the bundle.</li>
           {senderHidden && <li>Your name stays hidden from them. Your receipt details stay with Mystery Hub and the payment provider, as for any order.</li>}
         </ul>
         <div className="mg-actions mgg-actions">
-          <button type="button" className="mg-btn mg-btn-primary" disabled={quote?.state !== 'ready'} onClick={() => { const s = selection(); if (s) onContinue(s); }}>
+          <button type="button" className="mg-btn mg-btn-primary" disabled={!checkout} onClick={() => { if (checkout) onContinue(checkout); }}>
             Continue to payment<ArrowRight className="mg-icon" aria-hidden="true" />
           </button>
           <button type="button" className="mg-btn mg-btn-ghost" onClick={() => { moved.current = true; setStage('choose'); }}><ArrowLeft className="mg-icon" aria-hidden="true" />Change gift</button>
@@ -171,7 +224,10 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
   }
 
   const shown = list.filter(p => p.network === shownNetwork);
-  const describe = (key: keyof Problems) => problems[key] ? { 'aria-invalid': true, 'aria-describedby': `mgg-error-${key}` } : {};
+  const describe = (key: keyof Problems, ...more: string[]) => {
+    const ids = [problems[key] ? `mgg-error-${key}` : '', ...more].filter(Boolean).join(' ');
+    return { ...(problems[key] ? { 'aria-invalid': true } : {}), ...(ids ? { 'aria-describedby': ids } : {}) };
+  };
   return (
     <section className="mgg-picker" aria-labelledby="mgg-choose-title">
       <h1 id="mgg-choose-title" ref={heading} tabIndex={-1} className="mgg-title">Choose a data gift</h1>
@@ -194,7 +250,7 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
         <div className="mgg-bundles">
           {shown.map(p => (
             <label key={p.id} className="mgg-bundle">
-              <input type="radio" name="mgg-bundle" value={p.id} checked={productId === p.id} onChange={() => { setProductId(p.id); setProblems(x => ({ ...x, product: undefined })); }} />
+              <input type="radio" name="mgg-bundle" value={p.id} checked={productId === p.id} {...describe('product')} onChange={() => { setProductId(p.id); setProblems(x => ({ ...x, product: undefined })); }} />
               <span className="mgg-bundle-size">{p.allowance}</span>
               <span className="mgg-bundle-price">{cedis(p.priceMinor)}</span>
               {p.validity && <span className="mgg-bundle-validity">{p.validity}</span>}
@@ -206,15 +262,15 @@ export function GiftPicker({ products, quote, senderHidden = false, onReview, on
       <div className="mg-field">
         <label className="mg-label" htmlFor="mgg-field-number">Their mobile number</label>
         <input id="mgg-field-number" className="mg-input" type="tel" inputMode="numeric" autoComplete="off" placeholder="024 123 4567" value={number}
-          onChange={e => { setNumber(formatGhanaPhone(e.target.value)); setProblems(x => ({ ...x, number: undefined, confirm: undefined })); }} {...describe('number')} />
+          onChange={e => { setNumber(formatGhanaPhone(e.target.value)); setProblems(x => ({ ...x, number: undefined, confirm: undefined })); }} {...describe('number', 'mgg-help-number')} />
         {problems.number && <p className="mg-error" id="mgg-error-number">{problems.number}</p>}
       </div>
       <div className="mg-field">
         <label className="mg-label" htmlFor="mgg-field-confirm">Type their number again</label>
         <input id="mgg-field-confirm" className="mg-input" type="tel" inputMode="numeric" autoComplete="off" value={confirm}
-          onChange={e => { setConfirm(formatGhanaPhone(e.target.value)); setProblems(x => ({ ...x, confirm: undefined })); }} {...describe('confirm')} />
+          onChange={e => { setConfirm(formatGhanaPhone(e.target.value)); setProblems(x => ({ ...x, confirm: undefined })); }} {...describe('confirm', 'mgg-help-number')} />
         {problems.confirm && <p className="mg-error" id="mgg-error-confirm">{problems.confirm}</p>}
-        <p className="mg-help">A gift can’t be moved to another number once it’s sent, so it’s worth checking twice.</p>
+        <p className="mg-help" id="mgg-help-number">A gift can’t be moved to another number once it’s sent, so it’s worth checking twice.</p>
       </div>
       <div className="mg-actions mgg-actions">
         <button type="button" className="mg-btn mg-btn-primary" onClick={review}>Review gift<ArrowRight className="mg-icon" aria-hidden="true" /></button>
