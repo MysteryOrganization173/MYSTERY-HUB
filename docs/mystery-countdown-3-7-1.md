@@ -1,6 +1,6 @@
 # Mystery Hub 3.7.1 · Mystery Countdown
 
-**Status:** code release. Implemented, tested locally and independently reviewed; merge, deployment and live verification are recorded in section 13.
+**Status:** code release, merged in PR #154 (`bf906db`) and deployed on 28 November 2026. The link-preview head was verified live (read-only); the rest of the live check could not be made from the build sandbox. See section 13.
 
 **What it is:** an original New Year countdown at [`/countdown`](https://mysterybundlehub.com/countdown) to **midnight on 1 January 2027 in Accra** (Africa/Accra is GMT all year, with no daylight saving). It is public, needs no account, and is shareable. It works on its own from the moment it deploys, with every feature setting off.
 
@@ -288,4 +288,44 @@ An independent review agent read the whole change against the assignment, ran th
 - There is no data, setting or schema to undo, and nothing to clean up.
 - To withdraw only the discovery links, revert the `countdownInvite` changes; the page stays.
 
-**Where each part stands:** filled in at merge.
+**Pull request:** [#154](https://github.com/MysteryOrganization173/MYSTERY-HUB/pull/154), from `claude/project-thread-nn92c8`.
+- **Reviewed head:** `98c4871795c293fd5026d98c64d7fc975295e166`, directly on `7bf833b`. `main` did not move during the release, so nothing else was merged in. The only other open PR was the stale draft #69, which this release doesn't touch.
+- **Merge:** `bf906db5ce798428102516f9fadceb2001121ecc`, a merge commit, 28 November 2026 at about 03:01 (Accra time is UTC). Its tree is identical to the reviewed head's (`0ef5c47`).
+
+**CI ("Database security", `backend-rls`):**
+- passed on the PR head;
+- passed on `main` after the merge.
+
+**Deployment:**
+- Production now gives `/countdown` its own head (below). Before this release that path got the site's generic head, so the new server code is live.
+- A local build of the merged tree serves `index-BzMsjhbW.js`, replacing `index-0HDt-EWd.js` (3.6.4). The bundle name in production could not be read from the sandbox (see below).
+
+**Live verification** (read-only, 28 November 2026, about 03:11 Accra time). Only GET requests were made, with no sign-in, form or write.
+- **`/countdown`:**
+  - 200, HTML;
+  - title "Countdown to 2027 · Midnight in Accra — Mystery Hub", the before-midnight words, as the server's clock requires;
+  - canonical and `og:url` are `https://mysterybundlehub.com/countdown`;
+  - `og:image` is `https://mysterybundlehub.com/og/mystery-countdown-2027-v1.jpg`, 1200×630, `image/jpeg`, with the final alt text;
+  - `twitter:card` is `summary_large_image`.
+- **The homepage `/`:** 200, with its ordinary head unchanged.
+
+**Not verified live.** The sandbox's network policy denies `mysterybundlehub.com`, so the only route was a read-only page reader. That reader returns a page's head metadata only. It can't read images: the Greetings image, which has been live since 3.6, failed the same way as the countdown image, so this is the reader's limit and not the site's. It also obeys `robots.txt`, which disallows `/api`. These are therefore not checked live:
+- the preview image itself;
+- `/api/experiences/countdown`, and the clock admission in front of it;
+- the page rendering and counting in a browser;
+- the bundle name;
+- `/api/seasonal/status`. This release doesn't touch `SEASONAL_EXPERIENCE`. It was not set at the 3.6.4 check (27 November, 18:47 UTC), and it was not re-read here.
+
+Opening `https://mysterybundlehub.com/countdown` on a phone covers all of them except the seasonal status.
+
+**Where each part stands:**
+
+| State | What |
+|---|---|
+| Implemented, tested locally, reviewed | Everything in sections 1–9 (section 10 has the tests; section 12 has the review). |
+| Merged | PR #154, `bf906db`. |
+| Deployed | Yes. Production serves the 3.7.1 head for `/countdown`. |
+| Verified live (read-only) | The `/countdown` link-preview head; the ordinary homepage head is unchanged. |
+| Not yet verified live | The preview image, the clock endpoint, the page in a browser, the bundle name and the seasonal status. The build sandbox couldn't reach them. |
+| Awaiting activation | The seasonal homepage links wait for `SEASONAL_EXPERIENCE`, and the card under a New Year greeting waits for Mystery Greetings. `countdown_open` events wait for Greetings links (`MYSTERY_GREETING_LINKS_ENABLED`). The page itself needs none of them. |
+| Awaiting physical-device acceptance | Android Chrome, iPhone Safari, the WhatsApp in-app browser, and a real WhatsApp link preview. |
