@@ -454,7 +454,7 @@ async function runMtnDuplicateTests() {
     assert.strictEqual(ACTIVE_MTN_ORDER_CODE, 'ACTIVE_MTN_ORDER_EXISTS');
     assert.strictEqual(
       ACTIVE_MTN_ORDER_MESSAGE,
-      'You already have an MTN bundle being processed for this number. Please wait for it to be completed before placing another order.'
+      'An MTN order is already being processed for this number. Please wait for it to finish before placing another order.'
     );
     console.log('✓ 13. Structured response codes and messages verified');
     passed++;
