@@ -1,6 +1,6 @@
 # Mystery Hub 3.7.3 · Performance & Mobile Excellence
 
-**Status:** Implemented · Verified locally · Independently reviewed. Merge and deployment: section 16.
+**Status:** Implemented · Verified locally · Independently reviewed · Merged (`aca9351`) · Deployed · Verified live (read-only, partial: section 16) · Awaiting physical-device verification.
 
 This release makes Mystery Hub lighter and steadier to open on a slow phone, without a redesign. It doesn't change any price, payment, order, supplier, service control, account or financial rule. It doesn't touch the server, production configuration, Cloudinary assets, or the Website Builder, Business Workspace, editor and template renderers.
 
@@ -403,7 +403,27 @@ To be done by a person on real phones: ideally a low-cost Android (2 GB RAM, And
 
 ## 16. Deployment verification
 
-Pending merge. After the merge, this section records the post-merge CI and deployment results in a short follow-up record PR, as in Release A.
+Recorded on 28 November 2026 (UTC), after the merge.
+
+| Step | Result |
+|---|---|
+| Pull request | [#157](https://github.com/MysteryOrganization173/MYSTERY-HUB/pull/157). Reviewed head `bad4e5c`, based on `main` at `33c6826`; `main` had not moved, so nothing needed integrating |
+| CI on the pull request | `backend-rls` passed (06:08–06:10) |
+| Merge | Normal merge commit `aca9351` at 06:11. Its tree (`2c3bace`) is identical to the reviewed head's |
+| CI on `main` after the merge | Database security run 182 on `aca9351` passed (06:11–06:12) |
+| Deployment | At about 06:14, `https://mysterybundlehub.com/assets/index-CFc4Nm_B.js` answered 200 as JavaScript, starting with the same text as the local build of the merged tree. That build's file name is a content hash. The previous entry, `index-BzMsjhbW.js`, is no longer served. So production serves this release's build |
+| Live pages (read-only) | `/` answered 200 ("Mystery Hub — Digital Services Marketplace in Ghana") and `/countdown` answered 200 ("Countdown to 2027 · Midnight in Accra — Mystery Hub") |
+
+**Not verifiable from this sandbox.** The network policy blocks `mysterybundlehub.com` for browsers and scripts here, and the read-only fetch tool returns page metadata rather than raw HTML. So none of these were checked live:
+- the first script in the live HTML;
+- live timings;
+- the Greetings download;
+- the receipt and catalogue schedules;
+- images.
+
+The physical-device checklist (section 15) covers them.
+
+No production setting, secret, flag, schema or Cloudinary asset was changed.
 
 ## 17. Remaining limitations
 
