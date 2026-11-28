@@ -48,6 +48,40 @@ for(const token of ['','buyer-token'])test(`active MTN rejection is pre-init and
  const response=await request('payments/initialize',{...input(),productId:'mtn-1gb',recipientPhone:'0241234567'},token),data=await response.json();assert.equal(response.status,409);assert.equal(data.code,'ACTIVE_MTN_ORDER');assert.equal(data.checkout.paymentState,'not_started');assert.equal(data.existingOrderReference,token?'MH-owned-active':undefined);assert.equal(OrdersStore.adminDevOrders().length,1);
  const corrected=await request('payments/initialize',{...input(),productId:'mtn-1gb',recipientPhone:'0242222222'},token);assert.equal(corrected.status,200);
 });
+for (const service of ['airtime','instant_bundle'] as const) {
+ for (const phase of ['preflight','order insert'] as const) {
+  test(`${service} MTN ${phase} conflict only shows tracking details to the order owner`,async t=>{
+   t.mock.method(F,'preflightCheckAirtime',async()=>({allowed:true}));
+   t.mock.method(provider.client,'isFulfillmentEnabled',()=>false);
+   t.mock.method(provider.client,'checkInstantBundlesService',async()=>({permitted:true,available:true}));
+   t.mock.method(provider.client,'getInstantBundles',async()=>({
+    data:[{id:'privacy-fixture',name:'Fixture',network:'mtn',isFlexi:true,mode:'flexi',minAmountMajor:2,maxAmountMajor:100,payableRatio:0.95}],
+   }));
+   const payment=t.mock.method(P,'initializeTransaction',async()=>assert.fail('Conflict must precede payment'));
+   const existing=paymentOrder({user_id:'buyer',status:'processing',payment_status:'success',recipient_phone:'+233240000001'});
+   if(phase==='preflight') await OrdersStore.createOrder(existing);
+   else {
+    // The preliminary lookup saw no row. Supply the later transaction result
+    // without interleaving real payment or supplier operations.
+    t.mock.method(OrdersStore,'createOrderWithMtnDuplicateCheck',async()=>({success:false as const,existingOrder:existing}));
+   }
+   const fields=input({productId:service==='airtime'?'airtime-mtn-5':'instant-privacy-fixture',
+    serviceType:service,network:'mtn',recipientPhone:'0240000001',amount:5});
+   for (const token of ['', 'other-token', 'buyer-token']) {
+    const response=await request('payments/initialize',fields,token);
+    assert.equal(response.status,409);
+    const result=await response.json();
+    const owned=token==='buyer-token';
+    assert.equal(result.code,'ACTIVE_MTN_ORDER_EXISTS');
+    assert.deepEqual(Object.keys(result).sort(),owned?['code','existingOrderReference','existingOrderStatus','message']:['code','message']);
+    assert.equal(result.existingOrderReference,owned?existing.public_reference:undefined);
+    assert.equal(result.existingOrderStatus,owned?'processing':undefined);
+   }
+   assert.equal(payment.mock.callCount(),0);
+   assert.equal(OrdersStore.adminDevOrders().length,phase==='preflight'?1:0);
+  });
+ }
+}
 test('guest pricing rejection cannot label a concurrently initialized request as not started',async()=>{
  const original=C.prepare,requestId=randomUUID();let release!:()=>void,entered!:()=>void,calls=0;const started=new Promise<void>(r=>entered=r);
  C.prepare=(async(...args:Parameters<typeof C.prepare>)=>{if(++calls===1){entered();await new Promise<void>(r=>release=r);throw new FinanceError('Quote changed');}return original.apply(C,args);}) as typeof C.prepare;

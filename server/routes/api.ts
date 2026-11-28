@@ -50,11 +50,7 @@ import { resolveReorder } from '../services/reorderService.js';
 import { validateOrderPayment } from '../services/paymentValidation.js';
 import { SuccessBizHubWebhookHandler } from '../suppliers/successBizHub/webhookHandler.js';
 import { websiteRouter, handlePublicSiteBySlug } from './websiteApi.js';
-import {
-  ACTIVE_MTN_ORDER_CODE,
-  ACTIVE_MTN_ORDER_MESSAGE,
-  mapToSafeCustomerStatus,
-} from '../services/duplicateOrderProtection.js';
+import { activeMtnOrderConflict } from '../services/duplicateOrderProtection.js';
 
 import { afaRouter } from './afaApi.js';
 import { creativeStudioRouter } from './creativeStudioApi.js';
@@ -556,12 +552,7 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
       if (network === 'mtn') {
         const activeMtnOrder = await OrdersStore.findActiveMtnOrder(phoneVal.normalized);
         if (activeMtnOrder) {
-          res.status(409).json({
-            code: ACTIVE_MTN_ORDER_CODE,
-            message: ACTIVE_MTN_ORDER_MESSAGE,
-            existingOrderReference: activeMtnOrder.public_reference,
-            existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
-          });
+          res.status(409).json(activeMtnOrderConflict(activeMtnOrder, req.user?.id));
           return;
         }
       }
@@ -632,12 +623,7 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
 
       const createResult = await OrdersStore.createOrderWithMtnDuplicateCheck(newOrder);
       if (!createResult.success) {
-        res.status(409).json({
-          code: ACTIVE_MTN_ORDER_CODE,
-          message: ACTIVE_MTN_ORDER_MESSAGE,
-          existingOrderReference: createResult.existingOrder.public_reference,
-          existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
-        });
+        res.status(409).json(activeMtnOrderConflict(createResult.existingOrder, req.user?.id));
         return;
       }
 
@@ -731,12 +717,7 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
 
         if (activeMtnOrder) {
           console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
-          res.status(409).json({
-            code: ACTIVE_MTN_ORDER_CODE,
-            message: ACTIVE_MTN_ORDER_MESSAGE,
-            existingOrderReference: activeMtnOrder.public_reference,
-            existingOrderStatus: mapToSafeCustomerStatus(activeMtnOrder.status),
-          });
+          res.status(409).json(activeMtnOrderConflict(activeMtnOrder, req.user?.id));
           return;
         }
       }
@@ -827,12 +808,7 @@ apiRouter.post('/payments/initialize', restrictSharedMerchantCheckout, optionalA
 
       if (!createResult.success) {
         console.info(`[Checkout Timing] total=${Math.round(performance.now() - reqStart)}ms`);
-        res.status(409).json({
-          code: ACTIVE_MTN_ORDER_CODE,
-          message: ACTIVE_MTN_ORDER_MESSAGE,
-          existingOrderReference: createResult.existingOrder.public_reference,
-          existingOrderStatus: mapToSafeCustomerStatus(createResult.existingOrder.status),
-        });
+        res.status(409).json(activeMtnOrderConflict(createResult.existingOrder, req.user?.id));
         return;
       }
 
