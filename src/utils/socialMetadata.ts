@@ -90,17 +90,18 @@ export function greetingsCreatorHead(): SocialHead {
 }
 
 /** Mystery Countdown link previews (3.7.1): one fixed 1200x630 card drawn from the real Midnight Dial, the same for everyone
- * and free of any personal data. Before midnight in Accra the words invite people to count down; afterwards they welcome
- * 2027 and never suggest the countdown is still running. The server's own clock decides, not the request. */
-export const COUNTDOWN_SHARE_IMAGE = { image: `${PUBLIC_ORIGIN}/og/mystery-countdown-2027-v1.jpg`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
-export const COUNTDOWN_IMAGE_ALT = '2027 in ivory and gold inside a midnight clock dial, beside the words Midnight in Accra: the Mystery Hub countdown to 2027';
+ * and free of any personal data. Before midnight in Ghana the words invite people to count down; afterwards they welcome
+ * 2027 and never suggest the countdown is still running. The server's own clock decides, not the request.
+ * 3.7 final: Ghana-wide words, so the card is v2 (a new file: link previews cache images by URL). */
+export const COUNTDOWN_SHARE_IMAGE = { image: `${PUBLIC_ORIGIN}/og/mystery-countdown-2027-v2.jpg`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
+export const COUNTDOWN_IMAGE_ALT = '2027 in ivory and gold inside a midnight clock dial, beside the words Midnight in Ghana: the Mystery Hub countdown to 2027';
 export function countdownHead(now: Date = new Date()): SocialHead {
   const passed = now.getTime() >= Date.parse(COUNTDOWN_TARGET);
   return {
-    title: passed ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : 'Counting down to 2027 · Midnight in Accra — Mystery Hub',
+    title: passed ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : 'Counting down to 2027 · Midnight in Ghana — Mystery Hub',
     // 3.7 closeout: the same warm words as the countdown's share message (src/countdown/share.ts), without emoji.
     description: passed ? 'Happy New Year! May 2027 bring you happiness, peace, new opportunities and countless reasons to smile. Afehyia pa!'
-      : 'Another year, another chance to make beautiful memories. Count down to midnight in Accra with Mystery Hub and let’s welcome 2027 together.',
+      : 'Another year, another chance to make beautiful memories. Count down to midnight in Ghana with Mystery Hub and let’s welcome 2027 together.',
     url: `${PUBLIC_ORIGIN}/countdown`, ...COUNTDOWN_SHARE_IMAGE, imageAlt: COUNTDOWN_IMAGE_ALT, icon: publicImageUrl(BRAND_IMAGE),
   };
 }

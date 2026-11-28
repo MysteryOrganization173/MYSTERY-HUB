@@ -11,17 +11,17 @@ export function NewYearCountdown({ onShown }: { onShown?: () => void }) {
   const shown = useRef(false);
   useEffect(() => { if (!shown.current && (view.state === 'running' || view.state === 'arrived')) { shown.current = true; onShown?.(); } }, [view.state, onShown]);
   if (view.state === 'unavailable' || view.state === 'over') return null;
-  if (view.state === 'arrived') return <section className="mg-countdown" aria-label="New Year in Accra"><p className="mg-countdown-title">It’s 2027 in Accra. Happy New Year!</p></section>;
+  if (view.state === 'arrived') return <section className="mg-countdown" aria-label="New Year 2027"><p className="mg-countdown-title">It’s 2027. Happy New Year!</p></section>;
   if (view.state === 'syncing') return <section className="mg-countdown" aria-hidden="true"><p className="mg-countdown-title">Counting down to 2027…</p></section>;
   const p = countdownParts(view.remainingMs);
   const cells: [number, string][] = [[p.days, p.days === 1 ? 'day' : 'days'], [p.hours, p.hours === 1 ? 'hour' : 'hours'], [p.minutes, p.minutes === 1 ? 'minute' : 'minutes'], [p.seconds, p.seconds === 1 ? 'second' : 'seconds']];
   return (
     <section className="mg-countdown" aria-labelledby="mg-countdown-title">
-      <p className="mg-countdown-title" id="mg-countdown-title">Until 2027 in Accra</p>
+      <p className="mg-countdown-title" id="mg-countdown-title">Until 2027</p>
       <div className="mg-countdown-grid" role="timer" aria-hidden="true">
         {cells.map(([value, label]) => <span key={label} className="mg-countdown-cell"><b>{String(value).padStart(2, '0')}</b><span>{label}</span></span>)}
       </div>
-      <p className="mg-sr">{p.days} days, {p.hours} hours and {p.minutes} minutes until midnight on 1 January 2027 in Accra.</p>
+      <p className="mg-sr">{p.days} days, {p.hours} hours and {p.minutes} minutes until midnight on 1 January 2027, Ghana time.</p>
       {/* 3.7.1: the full Mystery Countdown, a plain link (its own small page), offered only while there is a countdown. */}
       <a className="mg-countdown-link" href="/countdown">Watch the full countdown<span aria-hidden="true">→</span></a>
     </section>

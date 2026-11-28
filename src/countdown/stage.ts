@@ -53,49 +53,53 @@ export function dialModel(stage: Stage, remainingMs: number): DialModel {
 }
 
 export interface StageCopy { kicker: string; title: string; lede: string | null }
-const ACCRA = 'Accra · Ghana time';
+/**
+ * 3.7 final: Ghana-wide words, said once where they help (the kicker, the dial's caption, the time line) and not
+ * repeated everywhere. The clock still keeps Africa/Accra time (GMT), the same for the whole country.
+ */
+const GHANA = 'Ghana · GMT';
 
 /** The words for each stage. Greetings and time only: no offers, prices, giveaways or promises. */
 export function stageCopy(stage: Stage, serverNow: number | null = null): StageCopy {
   switch (stage) {
-    case 'days': return { kicker: ACCRA, title: 'Counting down to 2027', lede: 'Midnight in Accra is on its way. Share the countdown with the people you’ll welcome the new year with.' };
-    case 'eve': return { kicker: 'New Year’s Eve · Accra', title: 'Tonight we welcome 2027', lede: 'The final hours of 2026. Gather your people.' };
+    case 'days': return { kicker: GHANA, title: 'Counting down to 2027', lede: 'Midnight is on its way. Share the countdown with the people you’ll welcome the new year with.' };
+    case 'eve': return { kicker: 'New Year’s Eve', title: 'Tonight we welcome 2027', lede: 'The final hours of 2026. Gather your people.' };
     case 'hour': return { kicker: 'The final hour', title: 'Almost 2027', lede: null };
     case 'minute': return { kicker: 'The final minute', title: 'Here comes 2027', lede: null };
     case 'final': return { kicker: 'The final seconds', title: 'Ten seconds to 2027', lede: null };
     case 'welcome': return { kicker: welcomeKicker(serverNow), title: 'Welcome, 2027', lede: 'Happy New Year from all of us at Mystery Hub. Afehyia pa!' };
-    case 'commemorative': return { kicker: 'Accra · 1 January 2027', title: '2027 began here', lede: 'The countdown reached midnight in Accra on 1 January 2027, Ghana time. Thank you for counting down with Mystery Hub.' };
-    case 'unavailable': return { kicker: ACCRA, title: 'Counting down to 2027', lede: 'We can’t check the time in Accra right now. The countdown appears as soon as we can. We never guess it from your device’s clock.' };
-    default: return { kicker: ACCRA, title: 'Counting down to 2027', lede: null };
+    case 'commemorative': return { kicker: '1 January 2027', title: 'Welcome to a beautiful 2027', lede: 'The countdown reached midnight in Ghana on 1 January 2027. Thank you for counting down with Mystery Hub.' };
+    case 'unavailable': return { kicker: GHANA, title: 'Counting down to 2027', lede: 'We can’t synchronise the countdown right now. It appears as soon as we can. We never guess it from your device’s clock.' };
+    default: return { kicker: GHANA, title: 'Counting down to 2027', lede: null };
   }
 }
 
-/** "New Year’s Day · Accra", then "3 January 2027 · Accra": the real Accra date from the server's time. */
+/** "New Year’s Day · 2027", then "3 January 2027": the real date in Ghana, from the server's time. */
 export function welcomeKicker(serverNow: number | null) {
-  if (serverNow === null || !Number.isFinite(serverNow)) return 'Happy New Year · Accra';
+  if (serverNow === null || !Number.isFinite(serverNow)) return 'Happy New Year';
   const day = accraDate(new Date(serverNow));
-  if (day === '2027-01-01') return 'New Year’s Day · Accra';
+  if (day === '2027-01-01') return 'New Year’s Day · 2027';
   const [, , d] = day.split('-');
-  return `${Number(d)} January 2027 · Accra`;
+  return `${Number(d)} January 2027`;
 }
 
 /** Screen-reader words, spoken once when the stage changes while someone is counting (never every second). */
 export const STAGE_ANNOUNCEMENT: Partial<Record<Stage, string>> = {
-  eve: 'It’s New Year’s Eve in Accra.',
+  eve: 'It’s New Year’s Eve.',
   hour: 'One hour to go until 2027.',
   minute: 'One minute to go.',
   final: 'Ten seconds to go.',
-  welcome: 'Happy New Year! It’s 2027 in Accra.',
+  welcome: 'Happy New Year! Welcome to 2027.',
 };
 
 /** A sentence for screen readers, at minute precision (it is read on demand, not announced). */
 export function remainingSentence(remainingMs: number) {
   const total = shownSeconds(remainingMs);
-  if (total <= 60) return `${total} ${total === 1 ? 'second' : 'seconds'} until midnight on 1 January 2027 in Accra.`;
+  if (total <= 60) return `${total} ${total === 1 ? 'second' : 'seconds'} until midnight on 1 January 2027, Ghana time.`;
   const minutesTotal = Math.ceil(total / 60);
   const days = Math.floor(minutesTotal / 1440), hours = Math.floor(minutesTotal / 60) % 24, minutes = minutesTotal % 60;
   const part = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
   const parts = [days ? part(days, 'day') : '', hours ? part(hours, 'hour') : '', minutes ? part(minutes, 'minute') : ''].filter(Boolean);
   const words = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}` : parts[0];
-  return `About ${words} until midnight on 1 January 2027 in Accra.`;
+  return `About ${words} until midnight on 1 January 2027, Ghana time.`;
 }

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { ArrowRight, Link2, Maximize2, MessageCircle, Music, RefreshCw, RotateCcw, Share2, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowRight, Link2, Maximize2, MessageCircle, Music, RefreshCw, RotateCcw, Share2, X } from 'lucide-react';
 import { useCountdownClock, countdownParts, type ClockView } from '../greetings/countdown';
 import { GREETINGS_MARK } from '../greetings/chrome';
 import { analyticsAllowed, trackExperience } from '../greetings/analytics';
@@ -9,22 +9,29 @@ import { Dial, YearMark } from './Dial';
 import { STAGE_ANNOUNCEMENT, isAfter, isCounting, remainingSentence, shownSeconds, stageCopy, stageOf, type Stage } from './stage';
 import { canShareNatively, copyCountdownLink, countdownWhatsappHref, shareCountdown, COUNTDOWN_URL } from './share';
 import { fullscreenAvailable, fullscreenEvents, isFullscreen, keepScreenOn, leaveFullscreen, requestFullscreen } from './immersive';
-import { createCountdownSound, moodFor, soundSupported, type CountdownSound } from './sound';
+import { NOTE_TEXT, Player, useCountdownSound } from './Player';
+import { Fireworks } from './Fireworks';
+import { CELEBRATION_REDUCED_SECONDS, CELEBRATION_SECONDS } from './audioPlan';
+import type { CountdownSound, PlayerState } from './sound';
 
 /**
- * Mystery Countdown (/countdown): an original, shareable New Year countdown to midnight in Accra.
+ * Mystery Countdown (/countdown): an original, shareable New Year countdown to midnight in Ghana (GMT).
  *
  * Its own small surface (no app shell, account, checkout or Marketplace code). Time always comes from the server
  * through the shared engine in greetings/countdown.ts, which the card under New Year greetings also uses. The page
  * moves from calm anticipation to the final ten seconds, then one finite celebration for those who are actually here
  * at midnight; anyone arriving later gets a calm Welcome 2027 (with an optional, clearly labelled replay), and from
  * 8 January a quiet commemorative page.
+ *
+ * 3.7 final: a solo piano soundtrack with its own player (off until tapped), the countdown's own sounds for the final
+ * ten seconds and midnight, a cinematic final minute, golden fireworks for a finite celebration, and layouts composed for
+ * phones, tablets, laptops, desktops and TVs.
  */
 
 /** The celebration plays once per page load, whatever re-renders or re-mounts happen around it. */
 let livePlayed = false;
 export const resetLiveCelebrationForTests = () => { livePlayed = false; };
-const CELEBRATION_MS = 5200;
+const CELEBRATION_MS = CELEBRATION_SECONDS * 1000;
 
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 
@@ -40,6 +47,7 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
   const serverNow = view.state === 'running' || view.state === 'arrived' ? view.serverNow : null;
   const seconds = shownSeconds(remaining);
   const [celebration, setCelebration] = useState<null | 'live' | 'replay'>(null);
+  const [celebratedAt, setCelebratedAt] = useState(0);
   const [motion, setMotion] = useState(true);
   const [announcement, setAnnouncement] = useState('');
   const [immersive, setImmersive] = useState(false);
@@ -68,7 +76,8 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
   }, [live]);
   useEffect(() => {
     if (!celebration) return;
-    const timer = window.setTimeout(() => setCelebration(null), reducedMotion() ? 1200 : CELEBRATION_MS);
+    setCelebratedAt(performance.now());
+    const timer = window.setTimeout(() => setCelebration(null), reducedMotion() ? CELEBRATION_REDUCED_SECONDS * 1000 : CELEBRATION_MS);
     return () => window.clearTimeout(timer);
   }, [celebration]);
 
@@ -82,14 +91,13 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
     if (words && (stage !== 'welcome' || live)) setAnnouncement(words);
   }, [stage, live]);
 
-  useEffect(() => { if (isAfter(stage)) document.title = stage === 'welcome' ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : '2027 began in Accra — Mystery Hub'; }, [stage]);
+  useEffect(() => { if (isAfter(stage)) document.title = stage === 'welcome' ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : 'Welcome to a beautiful 2027 — Mystery Hub'; }, [stage]);
 
-  const sound = useCountdownSound();
-  useEffect(() => { if (stage === 'final' && seconds > 0) sound.instance?.tick(seconds); }, [stage, seconds, sound.instance]);
-  // The music follows the stage; in the final minute its build follows the seconds (a call per second, nothing more).
-  const buildProgress = stage === 'minute' ? Math.round(((60 - seconds) / 50) * 20) / 20 : 0;
-  useEffect(() => { sound.instance?.setMood(moodFor(stage), buildProgress); }, [stage, buildProgress, sound.instance, sound.on]);
-  useEffect(() => { if (celebration) sound.instance?.midnight(); }, [celebration, sound.instance]);
+  // Sound follows the clock: one call each time the shown second changes (or the stage does), never more often.
+  const { sound, state: player } = useCountdownSound();
+  const holding = live && celebration === null && !livePlayed;
+  useEffect(() => { if (celebration) sound?.celebrate(celebration); }, [celebration, sound]);
+  useEffect(() => { sound?.sync({ stage, remainingMs: remaining, serverNow, holding }); }, [sound, stage, seconds, holding, player.started]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const replay = useCallback(() => setCelebration('replay'), []);
   const after = isAfter(stage);
@@ -101,16 +109,22 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
   const igniting = celebration !== null;
   const yearLit = after && !igniting;
   const hideTitle = stage === 'final' && !igniting;
+  // The final minute, the ten seconds and the celebration take the whole screen's attention, on every size.
+  const focus = stage === 'minute' || stage === 'final' || igniting;
+  const kicker = igniting ? 'Afehyia pa! · Happy New Year' : copy.kicker;
 
   return (
-    <main ref={root} className="cd-page" data-stage={stage} data-celebration={celebration ?? undefined} data-immersive={immersive || undefined} data-motion={motion ? undefined : 'reduced'}>
+    <main ref={root} className="cd-page" data-stage={stage} data-celebration={celebration ?? undefined} data-focus={focus || undefined} data-immersive={immersive || undefined}
+      data-motion={motion ? undefined : 'reduced'} data-player={player.started || undefined}>
       <Sky />
+      {igniting && motion && <Fireworks key={celebratedAt} startedAt={celebratedAt} />}
+      {igniting && <span key={`r${celebratedAt}`} className="cd-reveal" aria-hidden="true" />}
       <div className="cd-shell">
-        <TopBar sound={sound} immersive={immersive} onImmersive={setImmersive} root={root} />
+        <TopBar sound={sound} player={player} immersive={immersive} onImmersive={setImmersive} root={root} />
         <header className="cd-head">
-          <p className="cd-kicker">{copy.kicker}</p>
+          <p className="cd-kicker">{kicker}</p>
           <h1 className={`cd-title${hideTitle ? ' cd-title-quiet' : ''}`} tabIndex={-1}>{igniting || stage === 'welcome' ? 'Welcome, 2027' : copy.title}</h1>
-          {lede && <p className={`cd-lede${reserve ? ' is-reserve' : ''}`} aria-hidden={reserve || undefined}>{lede}</p>}
+          {lede && !igniting && <p className={`cd-lede${reserve ? ' is-reserve' : ''}`} aria-hidden={reserve || undefined}>{lede}</p>}
         </header>
 
         <section className="cd-stage" aria-label={after ? 'Welcome 2027' : 'Countdown to 2027'}>
@@ -118,10 +132,12 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
             <DialCenter stage={stage} seconds={seconds} yearLit={yearLit} igniting={igniting} />
           </Dial>
           {celebration === 'replay' && <p className="cd-replay-note">Replay · not live</p>}
-          <Timer view={view} stage={stage} retry={retry} />
         </section>
+        <div className="cd-time"><Timer view={view} stage={stage} retry={retry} /></div>
 
-        {!immersive && <Actions stage={stage} replay={after ? replay : null} playing={celebration !== null} />}
+        {/* The live celebration has the screen to itself; a replay keeps its button (and the keyboard focus on it). */}
+        {!immersive && celebration !== 'live' && <Actions stage={stage} replay={after ? replay : null} playing={celebration !== null} />}
+        {sound && player.started && <Player sound={sound} state={player} immersive={immersive} />}
         <p className="cd-sr" aria-live="polite">{announcement}</p>
       </div>
     </main>
@@ -143,7 +159,7 @@ function DialCenter({ stage, seconds, yearLit, igniting }: { stage: Stage; secon
   return (
     <span className="cd-center-stack">
       <YearMark lit={false} igniting={false} />
-      <span className="cd-center-caption" aria-hidden="true">Midnight · Accra</span>
+      <span className="cd-center-caption" aria-hidden="true">Midnight · Ghana</span>
     </span>
   );
 }
@@ -161,13 +177,13 @@ function Timer({ view, stage, retry }: { view: ClockView; stage: Stage; retry: (
       <div className="cd-cells" data-count="4" aria-hidden="true">
         {['days', 'hours', 'minutes', 'seconds'].map(label => <span key={label} className="cd-cell"><Digits value="––" /><span className="cd-cell-label">{label}</span></span>)}
       </div>
-      <p className="cd-pending-note" role="status">{view.slow ? 'Still connecting… your connection seems slow.' : 'Checking the time in Accra…'}</p>
+      <p className="cd-pending-note" role="status">{view.slow ? 'Still connecting… your connection seems slow.' : 'Synchronising the countdown…'}</p>
     </div>
   );
-  if (view.state === 'confirming') return <p className="cd-status" role="status">{view.failed ? 'We can’t confirm the time in Accra right now. Trying again…' : 'Checking the time in Accra…'}</p>;
+  if (view.state === 'confirming') return <p className="cd-status" role="status">{view.failed ? 'We can’t synchronise the countdown right now. Trying again…' : 'Synchronising the countdown…'}</p>;
   if (view.state === 'unavailable') return (
     <div className="cd-status cd-status-error" role="alert">
-      <p>We can’t check the time in Accra right now.</p>
+      <p>We can’t synchronise the countdown right now.</p>
       <button type="button" className="cd-btn cd-btn-ghost" onClick={retry}><RefreshCw className="cd-icon" aria-hidden="true" />Try again</button>
     </div>
   );
@@ -182,7 +198,7 @@ function Timer({ view, stage, retry }: { view: ClockView; stage: Stage; retry: (
       : stage === 'hour' ? [[pad(minutes), unit(minutes, 'minute')], [pad(p.seconds), unit(p.seconds, 'second')]] : [];
   return (
     <div className="cd-timer-wrap">
-      <div className="cd-timer" role="timer" aria-label="Time until 2027 in Accra">
+      <div className="cd-timer" role="timer" aria-label="Time until 2027">
         {cells.length > 0 && (
           <div className="cd-cells" data-count={cells.length} aria-hidden="true">
             {cells.map(([value, label]) => <span key={label.replace(/s$/, '')} className="cd-cell"><Digits value={value} /><span className="cd-cell-label">{label}</span></span>)}
@@ -190,7 +206,7 @@ function Timer({ view, stage, retry }: { view: ClockView; stage: Stage; retry: (
         )}
         <span className="cd-sr">{remainingSentence(view.remainingMs)}</span>
       </div>
-      <p className="cd-when">{view.checking ? <span role="status">Re-checking the time…</span> : 'Midnight, 1 January 2027 · Accra time (GMT)'}</p>
+      <p className="cd-when">{view.checking ? <span role="status">Re-checking the time…</span> : 'Midnight, 1 January 2027 · GMT'}</p>
     </div>
   );
 }
@@ -223,71 +239,14 @@ const Actions = memo(function Actions({ stage, replay, playing }: { stage: Stage
         </div>
       )}
       <a className="cd-home" href="/" onClick={home}>Visit Mystery Hub<ArrowRight className="cd-icon" aria-hidden="true" /></a>
-      {!quiet && !noShare && <p className="cd-fine">Times are Accra time (GMT). The countdown follows Mystery Hub’s clock, not your device’s.</p>}
+      {!quiet && !noShare && <p className="cd-fine">The countdown follows Mystery Hub’s clock, not your device’s.</p>}
     </footer>
   );
 });
 
 /* ───────────────────────── Top bar: identity, sound and the immersive view ───────────────────────── */
 
-type SoundNote = '' | 'music' | 'effects' | 'blocked' | 'lost';
-
-function useCountdownSound() {
-  const [instance, setInstance] = useState<CountdownSound | null>(null);
-  const [on, setOn] = useState(false);
-  const [music, setMusicState] = useState(true);
-  const [note, setNote] = useState<SoundNote>('');
-  const supported = useRef(false);
-  useEffect(() => {
-    supported.current = soundSupported();
-    if (!supported.current) return;
-    // Nothing is created here: the audio context (and the music's code) only once the visitor taps.
-    const created = createCountdownSound();
-    setInstance(created);
-    const onVisible = () => {
-      if (document.visibilityState === 'hidden') { created?.pause(); return; }
-      void created?.resume().then(still => { if (!still) { setOn(false); setNote('lost'); } });
-    };
-    const onHide = () => created?.pause();
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('pagehide', onHide);
-    return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('pagehide', onHide); created?.close(); };
-  }, []);
-  // The note under the controls says what is playing, then steps aside.
-  useEffect(() => {
-    if (!note) return;
-    const timer = window.setTimeout(() => setNote(''), note === 'blocked' || note === 'lost' ? 6000 : 4000);
-    return () => window.clearTimeout(timer);
-  }, [note]);
-  // Each tap is numbered, so a start the visitor has already cancelled never reports back.
-  const request = useRef(0);
-  const toggle = useCallback(() => {
-    if (!instance) return;
-    const id = ++request.current;
-    if (instance.on) { instance.disable(); setOn(false); setNote(''); return; }
-    setOn(true);
-    // The browser may still refuse to start audio; the button then switches back off and the note says so.
-    void instance.enable().then(started => {
-      if (id !== request.current) return;
-      setOn(started); setNote(started ? (instance.music ? 'music' : 'effects') : 'blocked');
-    });
-  }, [instance]);
-  const toggleMusic = useCallback(() => {
-    if (!instance) return;
-    const next = !instance.music;
-    instance.setMusic(next); setMusicState(next); setNote(next ? 'music' : 'effects');
-  }, [instance]);
-  return { instance, on, music, note, toggle, toggleMusic };
-}
-
-const SOUND_NOTE: Record<Exclude<SoundNote, ''>, string> = {
-  music: 'Music on. Midnight has its own sounds.',
-  effects: 'Music off. Countdown sounds stay on.',
-  blocked: 'This browser didn’t allow sound. Try again.',
-  lost: 'The browser stopped sound. Tap Sound again.',
-};
-
-function TopBar({ sound, immersive, onImmersive, root }: { sound: ReturnType<typeof useCountdownSound>; immersive: boolean; onImmersive: (on: boolean) => void; root: RefObject<HTMLElement | null> }) {
+function TopBar({ sound, player, immersive, onImmersive, root }: { sound: CountdownSound | null; player: PlayerState; immersive: boolean; onImmersive: (on: boolean) => void; root: RefObject<HTMLElement | null> }) {
   const enterButton = useRef<HTMLButtonElement>(null), exitButton = useRef<HTMLButtonElement>(null);
   const wentFullscreen = useRef(false), active = useRef(false), wake = useRef<Awaited<ReturnType<typeof keepScreenOn>>>(null);
   const [canFullscreen, setCanFullscreen] = useState(false);
@@ -340,24 +299,18 @@ function TopBar({ sound, immersive, onImmersive, root }: { sound: ReturnType<typ
         </a>
       )}
       <div className="cd-tools">
-        {sound.instance && (
-          <button type="button" className="cd-tool" onClick={sound.toggle} aria-pressed={sound.on} title="Music and countdown sounds">
-            {sound.on ? <Volume2 className="cd-icon" aria-hidden="true" /> : <VolumeX className="cd-icon" aria-hidden="true" />}
-            <span className="cd-tool-label">{sound.on ? 'Sound on' : 'Sound off'}</span>
-          </button>
-        )}
-        {/* Only while sound is on: the background music can be turned off on its own (countdown sounds stay). */}
-        {sound.instance && sound.on && (
-          <button type="button" className="cd-tool" onClick={sound.toggleMusic} aria-pressed={sound.music} title="Background music">
+        {/* Sound starts only from this tap (never by itself, never from a shared link). Then the player takes over. */}
+        {sound && !player.started && (
+          <button type="button" className="cd-tool is-music" onClick={() => void sound.start()} title="Piano music and countdown sounds">
             <Music className="cd-icon" aria-hidden="true" />
-            <span className="cd-tool-label">{sound.music ? 'Music on' : 'Music off'}</span>
+            <span className="cd-tool-label">Play music</span>
           </button>
         )}
         {immersive
           ? <button ref={exitButton} type="button" className="cd-tool" onClick={exit}><X className="cd-icon" aria-hidden="true" /><span className="cd-tool-label">Exit full screen</span></button>
           : <button ref={enterButton} type="button" className="cd-tool" onClick={() => void enter()}><Maximize2 className="cd-icon" aria-hidden="true" /><span className="cd-tool-label">Full screen</span></button>}
       </div>
-      <p className="cd-sound-note" role="status">{sound.note ? SOUND_NOTE[sound.note] : ''}</p>
+      {!player.started && player.note && <p className="cd-sound-note" role="status">{NOTE_TEXT[player.note]}</p>}
     </div>
   );
 }

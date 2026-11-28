@@ -85,18 +85,22 @@ export function Dial({ stage, remainingMs, celebrating, motion, children }: { st
       {model.secondAngle !== null && (
         <>
           {/* 3.7.3: the seconds light is its own layer, so its turn each second is a compositor rotation instead of a
-              repaint of the whole dial for every frame of the movement. Same geometry, same timing. */}
-          <svg key={`s-${stage}`} className="cd-second-layer" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true" focusable="false" style={{ transform: `rotate(${model.secondAngle}deg)` }}>
-            <circle cx={C} cy={C - R} r="9" className="cd-second-glow" />
-            <circle cx={C} cy={C - R} r="3.2" className="cd-second-dot" />
-          </svg>
+              repaint of the whole dial for every frame of the movement. 3.7 final: the layer is a slim arm from the
+              centre to the ring (not a whole rotated square), so it never reaches past the dial, even on the
+              narrowest phone. Same geometry, same timing. */}
+          <span key={`s-${stage}`} className="cd-second-arm" aria-hidden="true" style={{ transform: `rotate(${model.secondAngle}deg)` }}>
+            <svg className="cd-second-light" viewBox="-10 -10 20 20" focusable="false">
+              <circle r="9" className="cd-second-glow" />
+              <circle r="3.2" className="cd-second-dot" />
+            </svg>
+          </span>
           <svg className="cd-dial-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true" focusable="false"><MidnightStar /></svg>
         </>
       )}
       {celebrating && motion && (
         <div className="cd-burst" aria-hidden="true">
           {RAYS.map((r, i) => <i key={`r${i}`} className="cd-ray" style={{ '--a': `${r.angle}deg`, '--d': `${r.delay}s` } as CSSProperties} />)}
-          {SPARKS.map((s, i) => <b key={`s${i}`} className="cd-spark" style={{ '--a': `${s.angle}deg`, '--r': `${(s.distance / 5).toFixed(1)}cqi`, '--d': `${s.delay}s`, '--s': `${s.size}px` } as CSSProperties} />)}
+          {SPARKS.map((s, i) => <b key={`s${i}`} className="cd-spark" style={{ '--a': `${s.angle}deg`, '--r': `${(s.distance / 5).toFixed(1)}cqi`, '--d': `${s.delay}s`, '--sz': `${s.size}px` } as CSSProperties} />)}
         </div>
       )}
       <div className="cd-dial-center">{children}</div>

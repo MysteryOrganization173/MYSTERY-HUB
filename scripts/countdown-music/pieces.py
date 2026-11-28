@@ -16,6 +16,14 @@ def tune(name: str):
     return parse(os.path.join(HERE, 'tunes', f'{name}.abc'))
 
 
+# Angels We Have Heard on High: the 'Gloria' melody is traditional, but the hymnal's harmony is Edward S. Barnes's
+# (1887-1958), still protected where copyright runs for the author's life plus 70 years (Ghana among them, until the
+# end of 2028). So only the melody is taken from the file, and this harmony was written for Mystery Hub.
+ANGELS_CHORDS = ('F:2 Am:2 | Am:1 Gm7:1 F:2 | Dm:1 C:1 F:2 | Dm:1 C7:1 F:2 | '
+                 'F:2 F/A:2 | Am7:1 Gm7:1 F:2 | Dm:1 Gm7:1 F/A:1 Am:1 | F/C:1 C7:1 F:2 | '
+                 'Fmaj7:2 Bb:2 | Gm:2 C7:2 | F/A:2 Bb:2 | Gm7:2 C:2 | Dm:1 C/E:1 F:1 Bb:1 | F/C:2 C7:2 | '
+                 'Fmaj7:2 Bb:2 | Gm:2 C7:2 | F/A:2 Bbmaj7:2 | Gm7:2 C7sus4:1 C7:1 | Bb:1 C:1 F/A:1 Gm7:1 | F/C:2 C7:2 | F:4')
+
 AULD_LANG_SYNE_MELODY = os.path.join(HERE, 'tunes', 'auld-lang-syne.abc')
 # Harmony written for these arrangements (the tune is traditional; no hymnal setting is used).
 ALS_CHORDS = ('F | Gm7:2 C7:2 | F:2 F7:2 | Bb | F:2 Dm:2 | Gm7:2 C7:2 | Dm:2 Gm7:1 C7:1 | F:3 Dm:1 | '
@@ -75,10 +83,10 @@ def pieces() -> dict[str, Piece]:
             ], final_chord='Aadd9'),
         'angels-we-have-heard': Piece(
             tune=tune('angels'), bpm=96, seed=17,
-            intro=Pass(melody='high', texture='flow', level=.28, tempo=.95),
+            intro=Pass(melody='high', texture='flow', level=.28, tempo=.95, chords=ANGELS_CHORDS),
             passes=[
-                Pass(melody='plain', texture='flow', level=.42),
-                Pass(melody='octaves', texture='flow', level=.56, swell=-.08),
+                Pass(melody='plain', texture='flow', level=.42, chords=ANGELS_CHORDS),
+                Pass(melody='octaves', texture='flow', level=.56, swell=-.08, chords=ANGELS_CHORDS),
             ], final_chord='Fadd9'),
         'hark-the-herald': Piece(
             tune=tune('hark'), bpm=88, seed=18,

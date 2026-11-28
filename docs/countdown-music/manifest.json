@@ -1,0 +1,575 @@
+{
+  "schema": 1,
+  "release": "Mystery Countdown 3.7 final",
+  "generatedBy": "scripts/countdown-music/manifest.py",
+  "servedFrom": "/countdown-audio/v1/ (pending the founder's hosting choice)",
+  "summary": {
+    "tracks": 11,
+    "vocals": false,
+    "thirdPartyRecordings": 0,
+    "licencesPurchased": 0
+  },
+  "tracks": [
+    {
+      "id": "silent-night",
+      "title": "Silent Night",
+      "composer": "Franz Xaver Gruber (1787-1863)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Stille Nacht' Franz Xaver Gruber, 1818. Setting: \"Concordia Kinderchöre\", 1908. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.06
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/silent-night.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2330399,
+          "seconds": 159.84
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/silent-night.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 3144141,
+          "seconds": 159.86
+        }
+      }
+    },
+    {
+      "id": "first-noel",
+      "title": "The First Noel",
+      "composer": "Traditional English carol",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'The First Noel' traditional English carol. Setting: \"The Methodist Sunday School Hymnal\", 1911. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.26
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/first-noel.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2328851,
+          "seconds": 159.74
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/first-noel.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 3169413,
+          "seconds": 159.77
+        }
+      }
+    },
+    {
+      "id": "away-in-a-manger",
+      "title": "Away in a Manger",
+      "composer": "James R. Murray (1841-1905)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Mueller' James R. Murray, 1887. Setting: \"Hymnal for American Youth\", 1919. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (as chords, re-voiced for piano).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.26
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/away-in-a-manger.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 1845991,
+          "seconds": 124.29
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/away-in-a-manger.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 2405133,
+          "seconds": 124.32
+        }
+      }
+    },
+    {
+      "id": "what-child",
+      "title": "What Child Is This?",
+      "composer": "Greensleeves, English traditional (16th century)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Greensleeves' 16th-century English traditional. Setting: \"The Sunday School Hymnal and Service Book\", 1871. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.81
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/what-child.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 1978963,
+          "seconds": 136.21
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/what-child.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 2684637,
+          "seconds": 136.25
+        }
+      }
+    },
+    {
+      "id": "bleak-midwinter",
+      "title": "In the Bleak Midwinter",
+      "composer": "Gustav Holst (1874-1934)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music and Setting: 'Cranham' Gustav Holst, 1906, alt. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -1.49
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/bleak-midwinter.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 3082975,
+          "seconds": 211.56
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/bleak-midwinter.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 4086933,
+          "seconds": 211.58
+        }
+      }
+    },
+    {
+      "id": "o-come-all-ye-faithful",
+      "title": "O Come, All Ye Faithful",
+      "composer": "John Francis Wade (1711-1786)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Adeste Fideles' John F. Wade, 1743. Setting: \"A Hymnal\" (Episcopal), 1916. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -1.57
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/o-come-all-ye-faithful.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2875273,
+          "seconds": 196.3
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/o-come-all-ye-faithful.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 3841317,
+          "seconds": 196.32
+        }
+      }
+    },
+    {
+      "id": "angels-we-have-heard",
+      "title": "Angels We Have Heard on High",
+      "composer": "Traditional French carol (Gloria)",
+      "source": "Melody only, from the Open Hymnal Project ABC edition 2026.11 (Music: 'Gloria' French carol melody. Setting: Edward S. Barnes, before 1916. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "Written for Mystery Hub. The hymnal harmony (Edward S. Barnes, 1887-1958) is not used: it is still protected where copyright lasts for the author's life plus 70 years, Ghana included, until the end of 2028.",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.9
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/angels-we-have-heard.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 1828176,
+          "seconds": 125.31
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/angels-we-have-heard.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 2390805,
+          "seconds": 125.35
+        }
+      }
+    },
+    {
+      "id": "hark-the-herald",
+      "title": "Hark! The Herald Angels Sing",
+      "composer": "Felix Mendelssohn (1809-1847), adapted by William H. Cummings (1831-1915)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Mendelssohn' from 'Festgesang' Felix Mendelssohn, 1840. Setting: William H. Cummings, 1857. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -1.25
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/hark-the-herald.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2780539,
+          "seconds": 189.31
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/hark-the-herald.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 3699429,
+          "seconds": 189.34
+        }
+      }
+    },
+    {
+      "id": "joy-to-the-world",
+      "title": "Joy to the World",
+      "composer": "After G. F. Handel, arranged by Lowell Mason (1792-1872)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Antioch', after Handel, arranged by Lowell Mason, 1836. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.36
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/joy-to-the-world.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 1758123,
+          "seconds": 121.96
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/joy-to-the-world.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 2440557,
+          "seconds": 121.99
+        }
+      }
+    },
+    {
+      "id": "auld-lang-syne",
+      "title": "Auld Lang Syne",
+      "composer": "Traditional Scottish melody",
+      "source": "Melody transcribed from the traditional tune as published with Robert Burns's words (1799).",
+      "sourceUrl": null,
+      "harmony": "Written for Mystery Hub (the melody is traditional; no published harmony is used).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -1.2
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/auld-lang-syne.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2965896,
+          "seconds": 199.38
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/auld-lang-syne.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 3884901,
+          "seconds": 199.42
+        }
+      }
+    },
+    {
+      "id": "ode-to-joy",
+      "title": "Ode to Joy",
+      "composer": "Ludwig van Beethoven (1770-1827), adapted by Edward Hodges (1796-1867)",
+      "source": "Open Hymnal Project ABC edition 2026.11 (Music: 'Ode to Joy' Ludwig van Beethoven, 1824, adapted by Edward Hodges. Setting: \"The Methodist Hymnal\", 1905. Public domain (Open Hymnal Project).)",
+      "sourceUrl": "https://openhymnal.org/OpenHymnal2026.11-abc.zip",
+      "harmony": "From the public-domain hymnal setting (its inner voices are heard in one verse).",
+      "arrangement": "Original solo-piano arrangement written for Mystery Hub (intro, verse textures, voicings, dynamics, pedalling, ending): scripts/countdown-music/pieces.py and arrange.py.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer",
+      "instrumentSource": "https://archive.org/details/SalamanderGrandPianoV3",
+      "instrumentSourceMirror": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "vocals": false,
+      "licence": {
+        "melodyAndSetting": "Public domain (composition and setting published before 1929; every author named died more than 70 years ago, except the harmony noted above, which is not used).",
+        "pianoSamples": "CC BY 3.0 (attribution required; commercial use allowed)",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/",
+        "recording": "Produced for Mystery Hub from the above; no third-party recording is used.",
+        "openHymnalTerms": "https://openhymnal.org/copying.html"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "Streaming on mysterybundlehub.com (and any Mystery Hub surface) without a fee, worldwide, with the attribution shown in the player credits.",
+      "modifications": "Arranged for solo piano, transposed and re-voiced by verse, performed from samples, room reverb added, mastered to -16 LUFS integrated with a true-peak ceiling, encoded to Opus and MP3.",
+      "loudness": {
+        "integratedLufs": -16.0,
+        "truePeakDb": -2.34
+      },
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/ode-to-joy.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 2186723,
+          "seconds": 150.02
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/ode-to-joy.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 2964357,
+          "seconds": 150.05
+        }
+      }
+    }
+  ],
+  "cues": [
+    {
+      "id": "final-minute",
+      "description": "The final minute: a piano build from T-60 to midnight.",
+      "composer": "Original for Mystery Hub (scripts/countdown-music/cues.py); Auld Lang Syne motif is traditional.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer; impacts, risers and fireworks synthesised in cues.py (no samples).",
+      "licence": {
+        "composition": "Original work for Mystery Hub; traditional melody in the public domain.",
+        "pianoSamples": "CC BY 3.0",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "As for the playlist.",
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/final-minute.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 849022,
+          "seconds": 60.01
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/final-minute.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 1114029,
+          "seconds": 60.02
+        }
+      }
+    },
+    {
+      "id": "ticks",
+      "description": "The final ten seconds: ten cues in 2-second slots, one per visible second.",
+      "composer": "Original for Mystery Hub (scripts/countdown-music/cues.py); Auld Lang Syne motif is traditional.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer; impacts, risers and fireworks synthesised in cues.py (no samples).",
+      "licence": {
+        "composition": "Original work for Mystery Hub; traditional melody in the public domain.",
+        "pianoSamples": "CC BY 3.0",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "As for the playlist.",
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/ticks.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 306673,
+          "seconds": 20.01
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/ticks.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 336861,
+          "seconds": 20.04
+        }
+      }
+    },
+    {
+      "id": "midnight-fx",
+      "description": "Midnight: impact, boom and golden fireworks (synthesised, with piano impact chord).",
+      "composer": "Original for Mystery Hub (scripts/countdown-music/cues.py); Auld Lang Syne motif is traditional.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer; impacts, risers and fireworks synthesised in cues.py (no samples).",
+      "licence": {
+        "composition": "Original work for Mystery Hub; traditional melody in the public domain.",
+        "pianoSamples": "CC BY 3.0",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "As for the playlist.",
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/midnight-fx.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 244125,
+          "seconds": 29.01
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/midnight-fx.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 515205,
+          "seconds": 29.04
+        }
+      }
+    },
+    {
+      "id": "midnight-music",
+      "description": "Midnight: the Auld Lang Syne chorus in festive octaves, then a calm final chord.",
+      "composer": "Original for Mystery Hub (scripts/countdown-music/cues.py); Auld Lang Syne motif is traditional.",
+      "performer": "Salamander Grand Piano V3 (Yamaha C5, sampled by Alexander Holm), played by the Mystery Hub offline renderer; impacts, risers and fireworks synthesised in cues.py (no samples).",
+      "licence": {
+        "composition": "Original work for Mystery Hub; traditional melody in the public domain.",
+        "pianoSamples": "CC BY 3.0",
+        "pianoSamplesLicenceUrl": "https://creativecommons.org/licenses/by/3.0/"
+      },
+      "attribution": "Piano: Salamander Grand Piano V3 by Alexander Holm, licensed CC BY 3.0. Arranged and recorded for Mystery Hub.",
+      "permittedUse": "As for the playlist.",
+      "files": {
+        "webm": {
+          "path": "countdown-audio/v1/midnight-music.webm",
+          "codec": "Opus in WebM, 96 kbps target, 48 kHz stereo",
+          "bytes": 383362,
+          "seconds": 29.01
+        },
+        "mp3": {
+          "path": "countdown-audio/v1/midnight-music.mp3",
+          "codec": "MP3 VBR (LAME V2), 44.1 kHz stereo",
+          "bytes": 568701,
+          "seconds": 29.04
+        }
+      }
+    }
+  ]
+}

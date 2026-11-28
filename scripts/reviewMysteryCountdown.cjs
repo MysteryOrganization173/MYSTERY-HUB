@@ -107,7 +107,7 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     ['minute', T - 47 * SEC, 'Here comes 2027'],
     ['final', T - 7.4 * SEC, 'Ten seconds to 2027'],
     ['welcome', T + 3 * HOUR, 'Welcome, 2027'],
-    ['commemorative', Date.parse('2027-02-10T12:00:00Z'), '2027 began here'],
+    ['commemorative', Date.parse('2027-02-10T12:00:00Z'), 'Welcome to a beautiful 2027'],
   ];
   for (const [name, serverAt, title] of phases) {
     await check(`phase ${name}: the server’s time decides, months-wrong device clock ignored`, async () => {
@@ -156,11 +156,12 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     await sleep(1_200);
     await shot(page, 'midnight-celebration-390');
     ok(/Welcome, 2027/.test(await page.textContent('h1')), 'Welcome title');
-    await page.clock.runFor(5_500);
+    // 3.7 final: a 22-second celebration (audioPlan.ts CELEBRATION_SECONDS).
+    await page.clock.runFor(21_500);
     ok(!(await page.getAttribute('.cd-page', 'data-celebration')), 'the celebration ends by itself');
     ok(!(await page.$('.cd-spark')), 'sparks removed');
     ok((await stage(page)) === 'welcome', 'welcome');
-    ok(/Happy New Year! It’s 2027 in Accra\./.test(await page.textContent('.cd-sr[aria-live]')), 'announced once');
+    ok(/Happy New Year! Welcome to 2027\./.test(await page.textContent('.cd-sr[aria-live]')), 'announced once');
     // Foreground returns, reconnects and a minute of time never bring it back.
     for (let i = 0; i < 3; i++) { await visibility(page, 'hidden'); await visibility(page, 'visible'); await page.evaluate(() => window.dispatchEvent(new Event('online'))); }
     await page.clock.runFor(60_000);
@@ -180,19 +181,19 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     const { page, context } = await open({ serverAt: T + 20 * SEC });
     await waitStage(page, 'welcome');
     for (let i = 0; i < 5; i++) { ok(!(await page.getAttribute('.cd-page', 'data-celebration')), 'no celebration'); await page.clock.runFor(1_000); }
-    ok(/New Year’s Day · Accra/.test(await page.textContent('.cd-kicker')), 'kicker');
+    ok(/New Year’s Day · 2027/.test(await page.textContent('.cd-kicker')), 'kicker');
     await context.close();
   });
 
-  await check('opened days later: the real Accra date; from 8 January commemorative with nothing to share', async () => {
+  await check('opened days later: the real Ghana date; from 8 January commemorative with nothing to share', async () => {
     const a = await open({ serverAt: Date.parse('2027-01-03T15:00:00Z') });
     await waitStage(a.page, 'welcome');
-    ok((await a.page.textContent('.cd-kicker')) === '3 January 2027 · Accra', 'kicker');
+    ok((await a.page.textContent('.cd-kicker')) === '3 January 2027', 'kicker');
     await a.context.close();
     const b = await open({ serverAt: Date.parse('2027-01-08T00:00:01Z') });
     await waitStage(b.page, 'commemorative');
     ok(!(await b.page.$('text=Copy link')), 'no sharing');
-    ok(/2027 began in Accra/.test(await b.page.title()), 'title');
+    ok(/Welcome to a beautiful 2027/.test(await b.page.title()), 'title');
     await b.context.close();
   });
 
@@ -206,7 +207,8 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     const anim = await page.$$eval('.cd-page *', els => els.filter(e => getComputedStyle(e).animationName !== 'none').length);
     ok(anim === 0, `${anim} animated elements`);
     await shot(page, 'midnight-reduced-motion-390');
-    await page.clock.runFor(1_300);
+    // 3.7 final: a calm 6-second moment (CELEBRATION_REDUCED_SECONDS), with nothing moving.
+    await page.clock.runFor(6_000);
     ok(!(await page.getAttribute('.cd-page', 'data-celebration')), 'short');
     await context.close();
   });
@@ -227,7 +229,7 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     state.reply = 'fail';
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[role="alert"]', { timeout: 15_000 });
-    ok(/We can’t check the time in Accra right now\./.test(await page.textContent('[role="alert"]')), 'message');
+    ok(/We can’t synchronise the countdown right now\./.test(await page.textContent('[role="alert"]')), 'message');
     ok(!(await page.$('.cd-cell')), 'no invented countdown');
     await shot(page, 'unavailable-390');
     state.reply = 'ok';
@@ -273,7 +275,7 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     const { page, context, state } = await open({ serverAt: T - 3 * DAY - 2 * HOUR - 30 * MIN });
     await waitStage(page, 'days');
     const before = await page.$$eval('.cd-cell', els => els.map(e => e.textContent).join(' '));
-    await page.evaluate(() => { window.__notes = []; new MutationObserver(() => window.__notes.push(document.querySelector('.cd-when')?.textContent)).observe(document.querySelector('.cd-stage'), { subtree: true, childList: true, characterData: true }); });
+    await page.evaluate(() => { window.__notes = []; new MutationObserver(() => window.__notes.push(document.querySelector('.cd-when')?.textContent)).observe(document.querySelector('.cd-shell'), { subtree: true, childList: true, characterData: true }); });
     await page.clock.setSystemTime(new Date(WRONG_DEVICE_CLOCK.getTime() + 5 * HOUR));
     await page.clock.runFor(1_500);
     await sleep(700); // the re-check's round trip (real network time)
@@ -352,15 +354,20 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     await context.close();
   });
 
-  await check('sound: off by default, on only after a tap, made in the page (no audio download)', async () => {
+  // 3.7 final: piano recordings with a player (scripts/reviewCountdownFinal.cjs records the full experience).
+  await check('sound: off by default; nothing downloaded until the tap; then one track and the countdown sounds', async () => {
     const { page, context, state } = await open({ serverAt: T - 30 * SEC });
     await waitStage(page, 'minute');
-    const button = page.getByRole('button', { name: 'Sound off' });
-    ok((await button.getAttribute('aria-pressed')) === 'false', 'off');
-    await button.click();
-    ok((await page.getByRole('button', { name: 'Sound on' }).getAttribute('aria-pressed')) === 'true', 'on after a tap');
+    ok(!(await page.$('.cd-player')), 'no player before the tap');
+    await page.clock.runFor(3_000);
+    ok(!state.requests.some(u => /countdown-audio/.test(u)), 'no audio before the tap');
+    await page.getByRole('button', { name: 'Play music' }).click();
+    await page.waitForSelector('.cd-player');
     await page.clock.runFor(35_000);
-    ok(!state.requests.some(u => /\.(mp3|ogg|wav|m4a|aac)(\?|$)/.test(u)), 'no audio files');
+    const audio = state.requests.filter(u => /countdown-audio/.test(u));
+    ok(audio.some(u => /final-minute\./.test(u)), 'the final-minute build');
+    ok(audio.some(u => /ticks\./.test(u)) && audio.some(u => /midnight-fx\./.test(u)), 'the countdown sounds');
+    ok(!audio.some(u => /silent-night|first-noel|away-in-a-manger/.test(u)), 'no Christmas tracks in the final minute');
     ok(state.errors.length === 0, state.errors.join('\n'));
     await context.close();
   });
@@ -430,6 +437,22 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
         await context.close();
       });
     }
+    // 3.7 final: the player, open (its More panel and credits too), on a phone and a desktop.
+    for (const [label, width, height, ua] of [['phone', 390, 844, ANDROID], ['desktop', 1440, 900, DESKTOP]]) {
+      await check(`axe (WCAG 2.1 AA) on the open music player (${label}): no violations`, async () => {
+        const { page, context } = await open({ serverAt: T - 3 * DAY, clock: false, ua, width, height });
+        await waitStage(page, 'days');
+        await page.getByRole('button', { name: 'Play music' }).click();
+        await page.waitForSelector('.cd-player');
+        const more = page.getByRole('button', { name: 'More sound controls' });
+        if (await more.isVisible()) await more.click();
+        await page.click('.cd-credits summary');
+        await page.addScriptTag({ path: AXE });
+        const v = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(x => `${x.id}: ${x.nodes.length} (${x.nodes.slice(0, 2).map(n => n.target.join(' ')).join('; ')})`));
+        ok(v.length === 0, v.join('\n'));
+        await context.close();
+      });
+    }
   } else notes.push('axe not run (COUNTDOWN_REVIEW_AXE not set)');
 
   await check('keyboard: every control reachable in order, visible focus, no traps', async () => {
@@ -473,7 +496,7 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.click('.mg-gift-button', { timeout: 15_000 });
     await page.waitForSelector('.mg-countdown-grid', { timeout: 15_000 });
-    ok(/Until 2027 in Accra/.test(await page.textContent('.mg-countdown')), 'card');
+    ok(/Until 2027/.test(await page.textContent('.mg-countdown')), 'card');
     const cells = await page.$$eval('.mg-countdown-cell b', els => els.map(e => e.textContent));
     ok(cells.length === 4 && cells[0] === '03', `cells ${cells}`);
     await shot(page, 'greetings-embedded-390');

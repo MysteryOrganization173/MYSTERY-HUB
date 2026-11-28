@@ -381,7 +381,7 @@ test('opened just after midnight, or days later: welcome (not live), then commem
   later.clock.start();
   await later.advance(later.rtt);
   assert.equal(stageOf(later.view!), 'welcome');
-  assert.equal(welcomeKicker((later.view as { serverNow: number }).serverNow), '3 January 2027 · Accra');
+  assert.equal(welcomeKicker((later.view as { serverNow: number }).serverNow), '3 January 2027');
   const week = new World(Date.parse('2027-02-14T09:00:00Z'));
   week.clock.start();
   await week.advance(week.rtt);
@@ -479,22 +479,25 @@ test('dial: the lit ring is the time left in its span and ends at midnight; the 
   assert.doesNotMatch(renderToStaticMarkup(React.createElement(Dial, { stage: 'welcome', remainingMs: 0, celebrating: true, motion: false, children: null })), /cd-spark|cd-ray/, 'no burst with reduced motion');
 });
 
-test('words: greetings and time only, Accra named, no offers or promises; spoken once per stage, minute precision', () => {
+// 3.7 final: the words name Ghana (the whole country keeps GMT), never one city; the clock itself is unchanged.
+test('words: greetings and time only, Ghana named, no offers or promises; spoken once per stage, minute precision', () => {
   const all = (['syncing', 'unavailable', 'confirming', 'days', 'eve', 'hour', 'minute', 'final', 'welcome', 'commemorative'] as Stage[])
     .map(s => stageCopy(s, T + HOUR)).flatMap(c => [c.kicker, c.title, c.lede ?? '']).join(' | ');
   assert.doesNotMatch(all, /discount|free|win|prize|reward|offer|bonus|GH[S₵]|%|promo|giveaway|deliver|guarantee/i);
-  assert.match(stageCopy('days').kicker, /Accra/);
+  assert.match(stageCopy('days').kicker, /Ghana/);
+  assert.doesNotMatch(all, /Accra/);
   assert.match(stageCopy('unavailable').lede!, /never guess it from your device’s clock/);
-  assert.equal(stageCopy('commemorative').title, '2027 began here');
+  assert.equal(stageCopy('commemorative').title, 'Welcome to a beautiful 2027');
   assert.doesNotMatch(stageCopy('commemorative').lede!, /live|now|join|countdown is on/i, 'nothing suggests it is still running');
-  assert.equal(welcomeKicker(T + 5 * HOUR), 'New Year’s Day · Accra');
-  assert.equal(welcomeKicker(Date.parse('2027-01-07T23:59:59Z')), '7 January 2027 · Accra');
+  assert.equal(welcomeKicker(T + 5 * HOUR), 'New Year’s Day · 2027');
+  assert.equal(welcomeKicker(Date.parse('2027-01-07T23:59:59Z')), '7 January 2027');
+  assert.equal(STAGE_ANNOUNCEMENT.welcome, 'Happy New Year! Welcome to 2027.');
   assert.deepEqual(Object.keys(STAGE_ANNOUNCEMENT).sort(), ['eve', 'final', 'hour', 'minute', 'welcome']);
-  assert.equal(remainingSentence(1_000), '1 second until midnight on 1 January 2027 in Accra.');
-  assert.equal(remainingSentence(45_000), '45 seconds until midnight on 1 January 2027 in Accra.');
-  assert.equal(remainingSentence(61_000), 'About 2 minutes until midnight on 1 January 2027 in Accra.');
-  assert.equal(remainingSentence(DAY + HOUR + MIN), 'About 1 day, 1 hour and 1 minute until midnight on 1 January 2027 in Accra.');
-  assert.equal(remainingSentence(3 * DAY), 'About 3 days until midnight on 1 January 2027 in Accra.');
+  assert.equal(remainingSentence(1_000), '1 second until midnight on 1 January 2027, Ghana time.');
+  assert.equal(remainingSentence(45_000), '45 seconds until midnight on 1 January 2027, Ghana time.');
+  assert.equal(remainingSentence(61_000), 'About 2 minutes until midnight on 1 January 2027, Ghana time.');
+  assert.equal(remainingSentence(DAY + HOUR + MIN), 'About 1 day, 1 hour and 1 minute until midnight on 1 January 2027, Ghana time.');
+  assert.equal(remainingSentence(3 * DAY), 'About 3 days until midnight on 1 January 2027, Ghana time.');
   assert.deepEqual([...COUNTING], ['days', 'eve', 'hour', 'minute', 'final']);
 });
 
@@ -505,7 +508,7 @@ const running = (ms: number, checking = false): ClockView => ({ state: 'running'
 
 test('page: honest syncing, slow and unavailable states with no invented numbers', () => {
   const syncing = render({ state: 'syncing', slow: false });
-  assert.match(text(syncing), /Checking the time in Accra…/);
+  assert.match(text(syncing), /Synchronising the countdown…/);
   assert.doesNotMatch(syncing, /role="timer"/);
   // An empty frame holds the timer's place (so nothing jumps when the time arrives), with dashes and never a number.
   const frame = syncing.match(/<div class="cd-cells"[\s\S]*?<\/div>/)![0];
@@ -515,21 +518,24 @@ test('page: honest syncing, slow and unavailable states with no invented numbers
   assert.match(text(render({ state: 'syncing', slow: true })), /Still connecting… your connection seems slow\./);
   const down = render({ state: 'unavailable' });
   assert.match(down, /role="alert"/);
-  assert.match(text(down), /We can’t check the time in Accra right now\. Try again/);
+  assert.match(text(down), /We can’t synchronise the countdown right now\. Try again/);
   assert.doesNotMatch(down, /role="timer"|cd-cell/);
-  assert.match(text(render({ state: 'confirming', failed: false })), /Checking the time in Accra…/);
-  assert.match(text(render({ state: 'confirming', failed: true })), /We can’t confirm the time in Accra right now\. Trying again…/);
+  assert.match(text(render({ state: 'confirming', failed: false })), /Synchronising the countdown…/);
+  assert.match(text(render({ state: 'confirming', failed: true })), /We can’t synchronise the countdown right now\. Trying again…/);
   assert.doesNotMatch(render({ state: 'confirming', failed: true }), /Welcome, 2027|role="timer"/);
 });
 
 test('page: each counting stage shows its own cells; the final minute and seconds drop sharing for focus', () => {
   const days = render(running(12 * DAY + 3 * HOUR + 4 * MIN + 5 * SEC));
   assert.match(days, /data-stage="days"/);
-  assert.match(days, /role="timer" aria-label="Time until 2027 in Accra"/);
+  assert.match(days, /role="timer" aria-label="Time until 2027"/);
   assert.match(days, /data-count="4"/);
   assert.match(text(days), /Counting down to 2027/);
   assert.match(text(days), /About 12 days, 3 hours and 5 minutes until midnight/);
-  assert.match(text(days), /Midnight, 1 January 2027 · Accra time \(GMT\)/);
+  assert.match(text(days), /Midnight, 1 January 2027 · GMT/);
+  assert.match(text(days), /Ghana · GMT/);
+  assert.match(text(days), /Midnight · Ghana/);
+  assert.doesNotMatch(text(days), /Accra/);
   assert.match(text(days), /WhatsApp \(opens WhatsApp\)/);
   assert.match(days, /Copy link/);
   assert.doesNotMatch(text(days), /\bsent\b/i);
@@ -561,13 +567,13 @@ test('page: welcome after midnight and the commemorative page; replay is offered
   const welcome = render({ state: 'arrived', serverNow: T + 2 * HOUR, live: false });
   assert.match(welcome, /data-stage="welcome"/);
   assert.doesNotMatch(welcome, /data-celebration/, 'the markup starts calm (whether it celebrates is an effect: see the next test and the browser review)');
-  assert.match(text(welcome), /New Year’s Day · Accra Welcome, 2027 Happy New Year from all of us at Mystery Hub\. Afehyia pa!/);
+  assert.match(text(welcome), /New Year’s Day · 2027 Welcome, 2027 Happy New Year from all of us at Mystery Hub\. Afehyia pa!/);
   assert.match(welcome, /Replay midnight/);
   assert.match(text(welcome), /Send New Year wishes with this page\./);
   assert.doesNotMatch(welcome, /role="timer"/);
   const later = render({ state: 'arrived', serverNow: Date.parse('2027-03-01T10:00:00Z'), live: false });
   assert.match(later, /data-stage="commemorative"/);
-  assert.match(text(later), /2027 began here/);
+  assert.match(text(later), /Welcome to a beautiful 2027/);
   assert.doesNotMatch(later, /WhatsApp|Copy link|role="timer"/);
   assert.match(later, /Visit Mystery Hub/);
   assert.match(read('src/countdown/CountdownPage.tsx'), /celebration === 'replay' && <p className="cd-replay-note">Replay · not live<\/p>/);
@@ -578,7 +584,9 @@ test('page (source pins; behaviour checked in the browser review): one live cele
   assert.match(page, /let livePlayed = false;/);
   assert.match(page, /const live = view\.state === 'arrived' && view\.live;/);
   assert.match(page, /if \(!live \|\| livePlayed\) return;\s*livePlayed = true;\s*setCelebration\('live'\);/);
-  assert.match(page, /setTimeout\(\(\) => setCelebration\(null\), reducedMotion\(\) \? 1200 : CELEBRATION_MS\)/);
+  // 3.7 final: the celebration lasts 22 seconds (6 with reduced motion), from the shared timeline in audioPlan.ts.
+  assert.match(page, /setTimeout\(\(\) => setCelebration\(null\), reducedMotion\(\) \? CELEBRATION_REDUCED_SECONDS \* 1000 : CELEBRATION_MS\)/);
+  assert.match(page, /const CELEBRATION_MS = CELEBRATION_SECONDS \* 1000;/);
   const css = read('src/countdown/countdown.css');
   assert.doesNotMatch(css, /animation[^;]*infinite/, 'every animation is finite');
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.cd-page \*, \.cd-page \*::before, \.cd-page \*::after \{ animation: none !important; transition: none !important; \}/);
@@ -597,7 +605,8 @@ test('page: accessible structure; announcements once per stage (source pins; spo
   const page = code(read('src/countdown/CountdownPage.tsx'));
   assert.match(page, /if \(was === stage \|\| !\(isCounting\(was\) \|\| was === 'confirming'\)\) return;/);
   assert.match(page, /if \(words && \(stage !== 'welcome' \|\| live\)\) setAnnouncement\(words\);/);
-  assert.match(page, /aria-pressed=\{sound\.on\}/);
+  // 3.7 final: sound starts from one labelled button; the player (Player.tsx) then carries the controls.
+  assert.match(page, /onClick=\{\(\) => void sound\.start\(\)\}/);
 });
 
 /* ───────────────────────── Sharing, sound and the immersive view ───────────────────────── */
@@ -618,28 +627,19 @@ test('sharing: one canonical link, nothing personal, never a claim that it was s
   for (const file of readdirSync('src/countdown')) assert.doesNotMatch(code(read(path.join('src/countdown', file))), /\bsent\b|delivered/i, file);
 });
 
-test('sound: off until tapped, built in the browser, never a download; quiet when unsupported or refused', async () => {
+// 3.7 final: the oscillator voices gave way to piano recordings with their own player. The controller is exercised
+// against a fake browser in mysteryCountdownFinal37.test.ts; these pins keep the 3.7.1 promises that still hold.
+test('sound: off until tapped; quiet when unsupported; nothing created or fetched before the tap', () => {
   assert.equal(soundSupported({} as Window), false);
-  assert.equal(createCountdownSound({} as Window), null);
-  const created: string[] = [];
-  class FakeContext { state = 'suspended'; currentTime = 0; destination = {}; constructor() { created.push('ctx'); } createGain() { return { gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: () => ({}) }; } createOscillator() { return { type: '', frequency: { value: 0 }, connect: () => ({ connect: () => ({}) }), start() {}, stop() {} }; } resume() { this.state = 'running'; return Promise.resolve(); } suspend() { return Promise.resolve(); } close() { return Promise.resolve(); } }
-  const sound = createCountdownSound({ AudioContext: FakeContext } as unknown as Window)!;
-  assert.equal(sound.on, false);
-  sound.tick(3); sound.midnight();
-  assert.equal(created.length, 0, 'nothing is created before the tap');
-  assert.equal(await sound.enable(), true);
-  assert.equal(sound.on, true);
-  assert.equal(created.length, 1);
-  sound.close();
-  assert.equal(sound.on, false);
-  class Refusing extends FakeContext { resume() { return Promise.reject(new Error('not allowed')); } }
-  const refused = createCountdownSound({ AudioContext: Refusing } as unknown as Window)!;
-  assert.equal(await refused.enable(), false, 'a refused start says so');
-  assert.equal(refused.on, false);
-  class Silent extends FakeContext { resume() { return Promise.resolve(); } }
-  assert.equal(await createCountdownSound({ AudioContext: Silent } as unknown as Window)!.enable(), false, 'still suspended: not on');
+  assert.equal(soundSupported(undefined), false);
+  assert.equal(createCountdownSound(null), null);
   const src = code(read('src/countdown/sound.ts'));
-  assert.doesNotMatch(src, /\.mp3|\.ogg|\.wav|fetch\(|new Audio\(|decodeAudioData/);
+  assert.doesNotMatch(src, /autoplay|\.autoplay\s*=/, 'never plays by itself');
+  assert.match(src, /el\.preload = 'none';/, 'the audio elements fetch nothing until a track is chosen');
+  const page = code(read('src/countdown/CountdownPage.tsx'));
+  assert.match(page, /\{sound && player\.started && <Player /, 'the player appears only after the tap');
+  assert.equal((page.match(/sound\.start\(\)/g) || []).length, 1, 'started in one place only');
+  assert.match(page, /onClick=\{\(\) => void sound\.start\(\)\}/, 'and that place is the button');
 });
 
 test('immersive: unsupported or refused full screen changes nothing; the wake lock is optional', async () => {
@@ -662,9 +662,11 @@ test('immersive: unsupported or refused full screen changes nothing; the wake lo
 
 test('link preview: words follow the server clock; the canonical /countdown head is meaningful and indexable', async () => {
   const before = countdownHead(new Date('2026-12-31T22:00:00Z'));
-  assert.equal(before.title, 'Counting down to 2027 · Midnight in Accra — Mystery Hub');
+  assert.equal(before.title, 'Counting down to 2027 · Midnight in Ghana — Mystery Hub');
   assert.equal(before.url, 'https://mysterybundlehub.com/countdown');
-  assert.equal(before.image, 'https://mysterybundlehub.com/og/mystery-countdown-2027-v1.jpg');
+  // 3.7 final: a new file name (v2, Ghana-wide words), so previews already cached under v1 are refreshed.
+  assert.equal(before.image, 'https://mysterybundlehub.com/og/mystery-countdown-2027-v2.jpg');
+  assert.doesNotMatch(`${before.title} ${before.description} ${before.imageAlt}`, /Accra/);
   assert.equal(before.imageWidth, 1200); assert.equal(before.imageHeight, 630);
   assert.ok(before.imageAlt && before.imageAlt.length > 20);
   const after = countdownHead(new Date(T));
@@ -682,7 +684,7 @@ test('link preview: words follow the server clock; the canonical /countdown head
 });
 
 test('link preview image: a real 1200x630 JPEG, small, with no date or number on it beyond 2027', () => {
-  const file = 'public/og/mystery-countdown-2027-v1.jpg';
+  const file = 'public/og/mystery-countdown-2027-v2.jpg';
   const jpeg = readFileSync(file);
   assert.equal(jpeg[0], 0xff); assert.equal(jpeg[1], 0xd8);
   let i = 2, size: [number, number] | null = null;
@@ -720,14 +722,21 @@ test('route: /countdown is its own small surface and never downloads the commerc
   }
   const files = [...seen].join('\n');
   assert.doesNotMatch(files, /App\.tsx|AppContext|apiClient|usePaystack|checkout|Marketplace|components\/auth/i, files);
-  assert.ok(seen.size < 20, `${seen.size} modules`);
+  // 3.7 final adds the player, the fireworks, the music list and the shared timeline (and drops the two synth files).
+  assert.ok(seen.size <= 24, `${seen.size} modules`);
 });
 
 test('security: no HTML sinks, no storage of anything personal, no device-clock countdown', () => {
   for (const file of readdirSync('src/countdown').map(f => path.join('src/countdown', f))) {
     const src = code(read(file));
     assert.doesNotMatch(src, /dangerouslySetInnerHTML|\.innerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/, file);
-    assert.doesNotMatch(src, /localStorage|sessionStorage|indexedDB|document\.cookie/, file);
+    // 3.7 final: the sound controller keeps three sound preferences in this browser (never anything personal).
+    if (file !== path.join('src/countdown', 'sound.ts')) assert.doesNotMatch(src, /localStorage|sessionStorage|indexedDB|document\.cookie/, file);
+    else {
+      assert.equal((src.match(/localStorage/g) || []).length, 1, 'read in one place');
+      assert.doesNotMatch(src, /sessionStorage|indexedDB|document\.cookie/);
+      assert.match(src, /setItem\(PREFS_KEY, JSON\.stringify\(\{ effects, volume, shuffle \}\)\)/, 'only the three sound preferences');
+    }
     if (file.endsWith('.tsx')) assert.doesNotMatch(src, /Date\.now\(\)|new Date\(\)/, `${file}: time only from the shared clock`);
   }
   const page = code(read('src/countdown/CountdownPage.tsx'));

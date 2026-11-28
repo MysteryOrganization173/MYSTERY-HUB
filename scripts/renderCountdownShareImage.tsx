@@ -1,5 +1,5 @@
 /**
- * Renders the Mystery Countdown link-preview card, public/og/mystery-countdown-2027-v1.jpg (1200x630 JPEG).
+ * Renders the Mystery Countdown link-preview card, public/og/mystery-countdown-2027-v2.jpg (1200x630 JPEG).
  *
  * The card is drawn from the page's own Midnight Dial and stylesheet, so the preview shows the real experience, and it
  * carries no date, number or personal detail (one fixed image for everyone, before and after midnight). Nothing is
@@ -24,12 +24,12 @@ interface Shot { setContent: (html: string, o: { waitUntil: 'networkidle' }) => 
 const { chromium } = createRequire(import.meta.url)('playwright') as { chromium: { launch: () => Promise<{ newPage: (o: object) => Promise<Shot>; close: () => Promise<void> }> } };
 
 const arg = (name: string) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
-const out = arg('--out') || 'public/og/mystery-countdown-2027-v1.jpg';
+const out = arg('--out') || 'public/og/mystery-countdown-2027-v2.jpg';
 const markFile = arg('--mark');
 const mark = markFile ? `data:image/png;base64,${readFileSync(markFile).toString('base64')}` : BUSINESS_CONFIG.brandMarkUrl.replace('/upload/', '/upload/f_png,w_96/');
 const css = readFileSync(path.resolve('src/countdown/countdown.css'), 'utf8');
 
-const centre = React.createElement('span', { className: 'cd-center-stack' }, React.createElement(YearMark, { lit: false, igniting: false }), React.createElement('span', { className: 'cd-center-caption' }, 'Midnight · Accra'));
+const centre = React.createElement('span', { className: 'cd-center-stack' }, React.createElement(YearMark, { lit: false, igniting: false }), React.createElement('span', { className: 'cd-center-caption' }, 'Midnight · Ghana'));
 const dial = renderToStaticMarkup(React.createElement(Dial, { stage: 'eve', remainingMs: 4 * 3600_000 + 21 * 60_000 + 9_000, celebrating: false, motion: false, children: centre }));
 const stars = STARS.map(s => `<circle cx="${s.x}" cy="${s.y}" r="${(s.r * 0.12).toFixed(3)}" opacity="${s.o}" />`).join('');
 
@@ -59,8 +59,8 @@ html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; backgrou
     <svg class="cd-stars" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" style="-webkit-mask-image:none;mask-image:none">${stars}</svg><span class="cd-horizon"></span></div>
   <div class="card">${dial}
     <div class="words">
-      <p class="cd-kicker">Accra · Ghana time</p>
-      <h1>Midnight in Accra</h1>
+      <p class="cd-kicker">Ghana · GMT</p>
+      <h1>Midnight in Ghana</h1>
       <p>The New Year countdown to 2027, live to the second.</p>
       <div class="brand"><img src="${mark}" alt="">Mystery Hub</div>
     </div>
