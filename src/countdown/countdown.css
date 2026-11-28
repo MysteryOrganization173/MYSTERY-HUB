@@ -88,9 +88,12 @@
 .cd-ticks line { stroke: #c9cde052; stroke-width: 1.2; stroke-linecap: round; }
 .cd-ticks line.is-major { stroke: #e3c27ab0; stroke-width: 1.8; }
 .cd-ring-track { fill: none; stroke: #ffffff12; stroke-width: 3; }
-.cd-ring-lit { fill: none; stroke: url(#cd-gold); stroke-width: 3.4; stroke-linecap: round; transition: stroke-dashoffset .95s linear; }
-.cd-page[data-stage="minute"] .cd-ring-lit { stroke-width: 4.4; }
-.cd-second { transform-box: view-box; transform-origin: 160px 160px; transition: transform .5s var(--cd-ease); }
+.cd-ring-lit { fill: none; stroke: url(#cd-gold); stroke-width: 3.4; stroke-linecap: round; }
+/* 3.7.3: only the final minute's ring travels far enough each second to glide (14 of its 854 units); before that it
+   moves under a pixel a second, and gliding it repainted the dial on every frame, all day. */
+.cd-page[data-stage="minute"] .cd-ring-lit { stroke-width: 4.4; transition: stroke-dashoffset .95s linear; }
+.cd-second-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;
+  transform-origin: 50% 50%; transition: transform .5s var(--cd-ease); will-change: transform; }
 .cd-second-dot { fill: #fff6dc; }
 .cd-second-glow { fill: var(--cd-gold); opacity: .22; }
 .cd-segments path { fill: none; stroke: #ffffff1c; stroke-width: 6; stroke-linecap: round; transition: stroke .35s ease; }

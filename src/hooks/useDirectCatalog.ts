@@ -63,8 +63,27 @@ export async function refreshDirectCatalog(){
   for(const listener of listeners)listener();
  }).finally(()=>{request=null;});return request;
 }
+/**
+ * 3.7.3: one refresh schedule for the whole page, however many parts show the catalogue (the homepage's featured Data,
+ * the Data page and the seasonal homepages each used to start their own minute timer and focus listener, so a page
+ * could ask several times a minute). The catalogue is still re-read every minute while visible and when the customer returns,
+ * and a newly shown part (or a minute tick just after a return) reuses an answer under 30 s old instead of asking again.
+ * Checkout asks the server for its own quote either way; this only decides how often the shelf itself is refreshed.
+ */
+export const CATALOG_REFRESH_MS=60_000,CATALOG_REUSE_MS=30_000;
+let lastAnswerAt=0,users=0,refreshTimer:ReturnType<typeof setInterval>|null=null;
+const hidden=()=>typeof document!=='undefined'&&document.visibilityState==='hidden';
+/** Asks again unless an answer arrived in the last 30 s (or the page is in the background, for the timer). */
+function refreshIfDue(){if(hidden()||(confirmed&&Date.now()-lastAnswerAt<CATALOG_REUSE_MS))return;void refreshDirectCatalog().then(()=>{lastAnswerAt=Date.now();}).catch(()=>{});}
+const onReturn=()=>{if(!hidden())refreshIfDue();};
+/** Starts (or joins) the page's one schedule; returns the part's release. Exported for tests. */
+export function startCatalogSchedule(){
+ users++;refreshIfDue();
+ if(users===1&&typeof window!=='undefined'){refreshTimer=setInterval(refreshIfDue,CATALOG_REFRESH_MS);window.addEventListener('focus',onReturn);document.addEventListener('visibilitychange',onReturn);}
+ return()=>{users--;if(users===0&&refreshTimer){clearInterval(refreshTimer);refreshTimer=null;window.removeEventListener('focus',onReturn);document.removeEventListener('visibilitychange',onReturn);}};
+}
 export function useDirectCatalog(){
  const result=useSyncExternalStore(fn=>{listeners.add(fn);return()=>{listeners.delete(fn);};},()=>current,()=>current);
- useEffect(()=>{const refresh=()=>{void refreshDirectCatalog().catch(()=>{});};refresh();const timer=setInterval(refresh,60000);window.addEventListener('focus',refresh);return()=>{clearInterval(timer);window.removeEventListener('focus',refresh);};},[]);
+ useEffect(startCatalogSchedule,[]);
  return result;
 }

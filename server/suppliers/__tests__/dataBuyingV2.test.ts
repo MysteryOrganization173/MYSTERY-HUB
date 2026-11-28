@@ -94,8 +94,9 @@ test('receipt timeline only advances from server-derived presentation', () => {
   const journey = helper.slice(helper.indexOf("if (journeyKind === 'delivery')"), helper.indexOf("} else if (journeyKind === 'resolution')"));
   assert.match(journey, /const payDone = dv\.paymentStageComplete && !unchecked;/, 'server state only, and never before the server has answered');
   assert.match(status, /orderReceiptView\(activeOrder\)/);
-  assert.equal((status.match(/setInterval\(/g) || []).length, 1, 'one status check timer, unchanged');
-  assert.match(status, /setInterval\(fetchServerStatus, 3000\)/);
+  // 3.7.3: one schedule for the status checks, in utils/receiptChecks (tested in performanceMobile373).
+  assert.equal((status.match(/setInterval\(|startReceiptChecks\(/g) || []).length, 1, 'one status check schedule');
+  assert.match(status, /startReceiptChecks\(\{\s*check: fetchServerStatus,/);
   // Ordinary receipts still wait for server payment state. Assisted receipts
   // complete a differently labelled source step, never a Paystack payment.
   for (const state of ['pending_payment', 'failed', 'cancelled', 'expired']) {

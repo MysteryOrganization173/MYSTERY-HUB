@@ -80,7 +80,7 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
   const dataNetworks=openNetworksLabel('data',serviceStatus);
   // A purchase that needs the customer, or is still moving, comes before new buying.
   const urgent=tone==='attention'||tone==='active';
-  const subline=tone==='attention'?'One of your orders needs attention.':tone==='active'?(prioritizesActive?'You have an order in progress.':'Your latest order is in progress.'):!loading&&!error&&!latest?'Welcome to Mystery Hub. Let’s get you connected.':'What would you like to do today?';
+  const subline=tone==='attention'?'One of your orders needs attention.':tone==='active'?(prioritizesActive?'You have an order in progress.':'Your latest order is in progress.'):!loading&&!error&&!latest?'Welcome! Let’s get you connected.':'What would you like to do today?';
   const reorder=(mode:'data'|'airtime',network:NetworkId)=>mode==='airtime'?actions.airtime(network):actions.data(network);
   const site=websiteCard(website);
   const spotlight=loading?<section aria-label="Latest order" className="member-order member-order-loading"><p role="status">Loading your orders…</p><span className="member-skeleton" aria-hidden="true"/><span className="member-skeleton is-short" aria-hidden="true"/></section>

@@ -701,8 +701,10 @@ test('route: /countdown is its own small surface and never downloads the commerc
   const main = code(read('src/main.tsx'));
   assert.match(main, /const countdownPath = \/\^\\\/countdown\\\/\?\$\/i\.test\(window\.location\.pathname\);/);
   assert.match(main, /countdownPath \? Promise\.all\(\[import\('\.\/countdown\/CountdownPage'\), import\('\.\/countdown\/countdown\.css'\)\]\)/);
-  assert.match(read('vite.config.ts'), /&&!\/\^\\\\\/countdown\\\\\/\?\$\/i\.test\(location\.pathname\)&&/);
-  if (existsSync('dist/index.html')) assert.match(read('dist/index.html'), /!\/\^\\\/countdown\\\/\?\$\/i\.test\(location\.pathname\)/);
+  // 3.7.3: the head script (utils/startupHints) leaves /countdown alone, by the same rule as main.tsx (performanceMobile373
+  // runs the script for every path).
+  assert.match(read('src/utils/startupHints.ts'), /countdown: \/\^\\\/countdown\\\/\?\$\/i,/);
+  if (existsSync('dist/index.html')) assert.match(read('dist/index.html'), /\|\|\/\^\\\/countdown\\\/\?\$\/i\.test\(p\)\|\|/);
   // The page's whole static import graph stays clear of the app, accounts, checkout and Paystack.
   const seen = new Set<string>(), queue = ['src/countdown/CountdownPage.tsx'];
   while (queue.length) {

@@ -258,9 +258,10 @@ test('the receipt drops late answers, never overlaps its checks, and keeps the e
   assert.match(modal, /if \(!alive\) return;/);
   assert.match(modal, /if \(inFlight\) return;/);
   assert.match(modal, /\(shown\.publicReference \|\| shown\.id\) === lookupReference/, 'an answer for another order is ignored');
-  assert.match(modal, /return \(\) => \{ alive = false; clearInterval\(interval\); \};/);
+  assert.match(modal, /return \(\) => \{ alive = false; stop\(\); \};/);
   assert.match(modal, /\}, \[isStatusModalOpen, lookupReference, isTerminal\]\);/, 'the loop no longer restarts on every app render');
-  assert.equal((modal.match(/setInterval\(/g) || []).length, 1); assert.match(modal, /setInterval\(fetchServerStatus, 3000\)/);
+  // 3.7.3: one schedule, in utils/receiptChecks: still 3 s while the order can move (performanceMobile373 runs it).
+  assert.equal((modal.match(/setInterval\(|startReceiptChecks\(/g) || []).length, 1); assert.match(modal, /startReceiptChecks\(\{\s*check: fetchServerStatus,/);
   // Only the public reference is shown or copied; no payment or internal identifiers.
   assert.match(modal, /navigator\.clipboard\.writeText\(displayRef\)/);
   for (const internal of ['paymentReference', 'supplier_order_id', 'supplier_response', 'failure_reason', 'admin_note', 'resolution_json', 'customer_email']) assert.ok(!modal.includes(internal), internal);

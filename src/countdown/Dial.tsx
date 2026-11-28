@@ -7,7 +7,9 @@ import { dialModel, type Stage } from './stage';
  *
  * Only a few attributes change each second (the ring's dash offset and the seconds light's rotation); the marks are
  * drawn once per stage. Every motion is a transition on transform, opacity or a dash offset, and stops with reduced
- * motion.
+ * motion. 3.7.3: a page left open for hours costs a phone almost nothing between seconds. The seconds light turns on
+ * its own compositor layer, and the ring glides only in the final minute, where it moves a visible distance each
+ * second (earlier it steps by a fraction of a pixel, so it simply steps: the dial looks the same).
  */
 const SIZE = 320, C = SIZE / 2, R = 136;
 export const RING_LENGTH = 2 * Math.PI * R;
@@ -37,6 +39,11 @@ const Segments = memo(function Segments({ lit }: { lit: number }) {
     </g>
   );
 });
+
+/** The one star at 12 o'clock: midnight, where every stage of the ring converges. */
+function MidnightStar() {
+  return <path className="cd-midnight-star" d={`M ${C} ${C - R - 27} l 3.2 8.8 l 8.8 3.2 l -8.8 3.2 l -3.2 8.8 l -3.2 -8.8 l -8.8 -3.2 l 8.8 -3.2 z`} />;
+}
 
 /** Champagne sparks and rays for the one celebration at midnight (not drawn at all with reduced motion). */
 export const SPARKS = Array.from({ length: 28 }, (_, i) => ({ angle: (i * 360) / 28 + ((i * 47) % 9) - 4, distance: 120 + ((i * 37) % 70), delay: ((i * 53) % 9) * 0.045, size: 3 + ((i * 29) % 4) }));
@@ -72,14 +79,20 @@ export function Dial({ stage, remainingMs, celebrating, motion, children }: { st
               <circle key={stage} className="cd-ring-lit" cx={C} cy={C} r={R} transform={`rotate(-90 ${C} ${C})`}
                 strokeDasharray={`${RING_LENGTH} ${RING_LENGTH}`} strokeDashoffset={-(1 - lit) * RING_LENGTH} />
             </>}
-        {model.secondAngle !== null && (
-          <g key={`s-${stage}`} className="cd-second" style={{ transform: `rotate(${model.secondAngle}deg)` }}>
+        {/* Over the seconds light, as before (it passes just under the star at 12 o'clock). */}
+        {model.secondAngle === null && <MidnightStar />}
+      </svg>
+      {model.secondAngle !== null && (
+        <>
+          {/* 3.7.3: the seconds light is its own layer, so its turn each second is a compositor rotation instead of a
+              repaint of the whole dial for every frame of the movement. Same geometry, same timing. */}
+          <svg key={`s-${stage}`} className="cd-second-layer" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true" focusable="false" style={{ transform: `rotate(${model.secondAngle}deg)` }}>
             <circle cx={C} cy={C - R} r="9" className="cd-second-glow" />
             <circle cx={C} cy={C - R} r="3.2" className="cd-second-dot" />
-          </g>
-        )}
-        <path className="cd-midnight-star" d={`M ${C} ${C - R - 27} l 3.2 8.8 l 8.8 3.2 l -8.8 3.2 l -3.2 8.8 l -3.2 -8.8 l -8.8 -3.2 l 8.8 -3.2 z`} />
-      </svg>
+          </svg>
+          <svg className="cd-dial-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true" focusable="false"><MidnightStar /></svg>
+        </>
+      )}
       {celebrating && motion && (
         <div className="cd-burst" aria-hidden="true">
           {RAYS.map((r, i) => <i key={`r${i}`} className="cd-ray" style={{ '--a': `${r.angle}deg`, '--d': `${r.delay}s` } as CSSProperties} />)}

@@ -5,7 +5,8 @@ import {
   accraDate, greetingsEntry, GREETINGS_COMING_SOON, parsePreviewDate, parseSeasonSetting, previewSeasonStatus, serverSeasonStatus,
   type GreetingsEntry, type SeasonalPackId, type SeasonStatus,
 } from '../../shared/seasonal';
-import { usableStoredSeason } from './seasonClock';
+import { scheduledPackFrom, usableStoredSeason } from './seasonClock';
+import { earlySeasonAnswer } from '../utils/startupHints';
 import { startSeasonSync } from './seasonSync';
 
 /**
@@ -86,13 +87,26 @@ function takePreviewFromUrl(): StoredPreview | null {
 
 /** The last server answer (if recent enough), so a returning visitor sees the season immediately. */
 const storedSeason = () => usableStoredSeason(readStorage<unknown>(() => localStorage, CACHE_KEY), Date.now());
+/**
+ * 3.7.3: where the page starts. The page's first script asks the server before the app has downloaded (startupHints.ts);
+ * if that answer is already here, a first-time visitor starts on the right appearance instead of switching from the
+ * ordinary homepage a moment later. It counts like a stored answer (the scheduler below still asks the server at once,
+ * as before): it says which pack is on, never corrects the clock, and keeps any correction this device already had.
+ */
+function startingSeason() {
+  const stored = storedSeason();
+  const early = earlySeasonAnswer();
+  // The newer of the two wins (the stored answer can be newer if this provider mounts again later on the same page).
+  if (!early || (stored && stored.at > early.at)) return stored;
+  return usableStoredSeason({ pack: scheduledPackFrom(early.data), at: early.at, skew: stored?.skew ?? 0 }, Date.now()) ?? stored;
+}
 /** The status for one Accra day, from the pack the server switched on (or none). */
 const statusOn = (pack: SeasonalPackId | null, day: string) => serverSeasonStatus(pack, new Date(day + 'T12:00:00Z'));
 
 export const SeasonProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthChecking } = useApp();
   const [preview, setPreview] = useState<StoredPreview | null>(takePreviewFromUrl);
-  const [initial] = useState(storedSeason);
+  const [initial] = useState(startingSeason);
   const [scheduled, setScheduled] = useState<SeasonalPackId | null>(initial?.pack ?? null);
   const skew = useRef(initial?.skew ?? 0);
   const [today, setToday] = useState(() => accraDate(new Date(Date.now() + skew.current)));

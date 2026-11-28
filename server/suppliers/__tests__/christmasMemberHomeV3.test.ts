@@ -52,7 +52,7 @@ test('the seasonal member homepage tells the same order truth as the ordinary on
       for (const piece of [latest.public_reference, 'GH₵' + (latest.amount / 100).toFixed(2)]) assert.ok(s.includes(piece), `${name}: ${piece}`);
       if (!/Latest order/.test(o)) assert.ok(s.includes(memberOrderNext(latest).replace(/'/g, '’')) || s.includes(memberOrderNext(latest)), `${name}: next step`);
     }
-    for (const sub of ['One of your orders needs attention.', 'You have an order in progress.', 'Your latest order is in progress.', 'Welcome to Mystery Hub. Let’s get you connected.', 'What would you like to do today?']) assert.equal(s.includes(sub), o.includes(sub), `${name}: subline ${sub}`);
+    for (const sub of ['One of your orders needs attention.', 'You have an order in progress.', 'Your latest order is in progress.', 'Welcome! Let’s get you connected.', 'What would you like to do today?']) assert.equal(s.includes(sub), o.includes(sub), `${name}: subline ${sub}`);
     assert.equal(/is-urgent/.test(seasonal(props)), /is-urgent/.test(ordinary(props)), `${name}: urgency`);
     // Progress: the same steps lit, never Delivered ahead of the server.
     const lit = (html: string) => (html.match(/: complete</g) || []).length;
