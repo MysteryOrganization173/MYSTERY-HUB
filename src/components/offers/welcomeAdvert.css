@@ -9,13 +9,24 @@
 .mh-wa-line { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-height: 28px; margin: 0; padding: 3px 11px 3px 9px; border-radius: 999px;
   border: 1px solid #44df9540; background: linear-gradient(90deg, #00c36524, #00c3650a); font-weight: 500; font-size: .78rem; line-height: 1.3; font-family: inherit; white-space: nowrap; }
 .mh-wa-line .mh-wa-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.mh-wa-line.is-action { cursor: pointer; color: var(--wa-soft); -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: border-color .2s ease, background-color .2s ease; }
+.mh-wa-line.is-action { position: relative; z-index: 1; cursor: pointer; color: var(--wa-soft); -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: border-color .2s ease, background-color .2s ease; }
 .mh-wa-line.is-action:hover { border-color: #44df9580; }
+/* The pill is 28px tall so the hero keeps its height; the tappable area reaches 44px around it (9px past the 1px border). */
+.mh-wa-line.is-action::after { content: ''; position: absolute; inset: -9px -5px; }
 .mh-wa-line.is-action .mh-wa-arrow { color: var(--wa-green-2); }
 .mh-wa-line:focus-visible, .mh-wa-cta:focus-visible { outline: 2px solid var(--wa-green-2); outline-offset: 2px; }
 .mh-wa-line .mh-wa-ready { color: var(--wa-green-2); font-weight: 700; }
+/* Wide screens and phones each show their own wording (and only that wording is read), so what is seen is what is said. */
 .mh-wa .mh-wa-wide { display: none; }
-@media (min-width: 640px) { .mh-wa .mh-wa-wide { display: inline; } }
+@media (min-width: 640px) { .mh-wa .mh-wa-wide { display: inline; } .mh-wa .mh-wa-narrow { display: none; } }
+/* On phones the words "sign up" are the action, so the arrow steps aside; the narrowest phones also drop the gift icon
+   and set the line a touch smaller, so the whole line fits at 320px. */
+@media (max-width: 639px) { .mh-wa-line.is-action .mh-wa-arrow { display: none; } }
+@media (max-width: 399px) { .mh-wa-line.is-action { font-size: .75rem; } .mh-wa-line.is-action .mh-wa-icon { display: none; } }
+/* The narrowest phones drop the "Ready:" word visually (the tick still says it); screen readers still hear it. */
+@media (max-width: 399px) {
+  .mh-wa-line .mh-wa-ready { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
 
 /* Chip: in the member homepage's "Start here" heading row. */
 .mh-wa-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 10px 2px 8px; border-radius: 999px; border: 1px solid #44df9540;

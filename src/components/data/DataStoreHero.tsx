@@ -100,7 +100,7 @@ export function DataStoreHero({ mode = 'data', offer = null }: { mode?: DataStor
           nobody sees an empty gap. */}
       <div className="mh-ds-offer-slot">{offer || <p className="mh-ds-offer-default"><Receipt aria-hidden="true" />Total shown before you pay</p>}</div>
       <div className="mh-ds-hero-body">
-        <p className="mh-ds-lede">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel.<span className="mh-ds-wide"> Pay with Mobile Money and see the total before you pay.</span></p>
+        <p className="mh-ds-lede">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel.</p>
         <ul className="mh-ds-assure" aria-label="How buying works">
           <li><Smartphone aria-hidden="true" />Mobile Money via Paystack</li>
           <li><ShieldCheck aria-hidden="true" />Track every order</li>

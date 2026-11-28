@@ -42,6 +42,7 @@ After midnight:
 - **Native sharing** passes the text and the link separately. The share sheet adds the link once, so it never appears twice.
 - **WhatsApp** sends the text, a line break, then the canonical link.
 - **Link previews** (`countdownHead`) use the same words without emoji: titles "Counting down to 2027 · Midnight in Accra" and "Happy New Year 2027 · Afehyia pa!".
+- **Share-sheet and tab titles** match: "Counting down to 2027 · Mystery Hub" before midnight, "Happy New Year 2027 · Mystery Hub" after, and the browser tab reads "Happy New Year 2027 · Afehyia pa! — Mystery Hub" once it is 2027.
 - **Unchanged:** the canonical URL, no tracking parameters, nothing personal, and no "sent" claim.
 
 ## 3. Countdown sound
@@ -57,10 +58,11 @@ After midnight:
   - **Final ten seconds:** the music steps back and holds the chord that resolves at midnight. Each second plays its own rising note (ten different notes up the scale).
   - **Midnight:** a warm low swell, a rising bell chord (F A C F) and a scatter of chimes like sparks. The pad blooms into the home chord, then settles into a slower, brighter welcome.
 - **Controls:** one **Sound** button, off by default. While sound is on, a second **Music** button lets the visitor keep only the countdown sounds (final ten seconds and midnight). A short note under the controls says what is playing for a few seconds ("Music on. Midnight has its own sounds." or "Music off. Countdown sounds stay on."). It sits outside the page flow, so it moves nothing.
-- **Browser limits, stated honestly:** audio starts only from the tap. If the browser refuses, the button switches back off and the note says "This browser didn't allow sound. Try again." A phone's silent switch or media volume can still mute it, and the page can't detect that.
+- **Browser limits, stated honestly:** audio starts only from the tap. If the browser refuses, the button switches back off and the note says "This browser didn't allow sound. Try again." A quick on-then-off tap never shows that note. If a phone won't restart audio when the visitor comes back to the page, the button switches off and the note says "The browser stopped sound. Tap Sound again." A phone's silent switch or media volume can still mute it, and the page can't detect that.
 - **Loading:** nothing is created before the tap. The music's code is its own small chunk (1.8 KB gzip), fetched on the tap, and the countdown's first load is unchanged.
-- **Hidden and leaving:** hiding the page suspends the audio and stops all scheduling. Coming back resumes it. Leaving the page closes it.
-- **Comfortable level:** a gentle limiter on the output. In an offline render of 60 s (calm, build, final ten seconds, midnight), the peak was 0.29 of full scale and the overall level −27 dBFS. Only the first second (the fade-in) was near-silent.
+- **Hidden and leaving:** hiding the page suspends the audio and stops all scheduling. Coming back resumes it, or says it couldn't (above). Leaving the page closes it, and no timer is left running.
+- **Top bar:** below 500 px the three tools show icons only (with their names for screen readers), so they never crowd the brand mark.
+- **Comfortable level:** a gentle limiter on the output. In an offline render of 60 s (calm, build, final ten seconds, midnight), the peak was 0.29 of full scale and the overall level −27 dBFS. Every second stayed between −21 and −36 dBFS, except the first second (the fade-in) and the end of the midnight ring.
 - **Countdown accuracy and performance:** timing still comes only from the server clock. Sound follows the stage the page already shows. Audio runs on the browser's audio thread, and the scheduler wakes four times a second only while sound is on and the page is visible.
 - **Reduced motion and accessibility:** unchanged. The buttons have `aria-pressed`, and the note is a polite status.
 
@@ -103,12 +105,14 @@ The Countdown's change is lab noise: its font is identical. Lab figures are not 
 | Visitor | The line shows |
 |---|---|
 | Before the server answers | "Total shown before you pay" |
-| Guest, offer on | "Up to 18% off your first bundle", a button that opens free sign-up ("· create a free account" on wider screens) |
-| Eligible member | "Ready: up to 18% off your first bundle" |
+| Guest, offer on | "Up to 18% off your first bundle · sign up" ("· create a free account" from 640 px), a button that opens free sign-up |
+| Eligible member | "✓ Ready: up to 18% off your first bundle" (below 400 px the tick stands for "Ready:", which screen readers still hear) |
 | Everyone else | "Total shown before you pay" |
 
-- **No empty gap:** an ineligible customer never sees empty space; they keep the reassurance. "Total shown before you pay" moved there from the wide-screen list, so it is never shown twice.
-- **Verified in a browser:** with the quote held back 1.5 s, the line and the panel kept the same height before and after the answer at 320, 360, 390, 430, 768 and 1280 px. There was no layout shift and no overflow, and the offer text was not cut off.
+- **No empty gap:** an ineligible customer never sees empty space; they keep the reassurance. "Total shown before you pay" moved there from the wide-screen list, and the lede no longer repeats it, so it appears once.
+- **Cost:** the line is a new row, so the panel is 36 px taller on phones for every visitor (28 px line plus 8 px space). It is the same height before and after the answer, so it never moves the page.
+- **Touch and screen readers:** the guest pill is 28 px tall but its tappable area is 44 px. What is on screen is exactly what a screen reader says, followed by "Welcome offer for new customers." (or "…on your account.").
+- **Verified in a browser:** with the quote held back 1.5 s, the line and the panel kept the same height before and after the answer at 320, 360, 390, 430, 768 and 1280 px. There was no layout shift and no overflow, and the offer text was never cut off (guests at all six widths, eligible members at 320 and 360 px).
 - **Lab:** Data guest CLS 0.117 → 0.000 (5-run median).
 - **Unchanged:** authoritative eligibility (the same server quote and cache), payment recovery first (the pending-payment banner still comes before the panel), and the bundle cards.
 
@@ -135,16 +139,26 @@ The Countdown's change is lab noise: its font is identical. Lab figures are not 
 
 | Surface | Guest | Eligible member | Anyone else |
 |---|---|---|---|
-| Ordinary homepage | Card beside "Popular data bundles": "Welcome offer · Up to 18% off · your first data bundle · For new customers · Create a free account". Its room is kept from the first paint, so it moves nothing. | (members see the member homepage) | Nothing |
+| Ordinary homepage | Card beside "Popular data bundles": "Welcome offer · Up to 18% off · your first data bundle · For new customers · Create a free account". Its room is kept from the first paint only until the server answers (at most 8 s), so it moves nothing, and a disabled offer or failed read leaves no empty box. | (members see the member homepage) | Nothing |
 | Ordinary member homepage | n/a | Chip "✓ Up to 18% off" in the "Start here" heading row (first purchase only). The row keeps its height. | Nothing |
 | Data page | Line under the title (section 5) | "Ready: up to 18% off your first bundle" | Reassurance line |
 | Christmas homepages | Existing Welcome card, same figure | Same | Nothing |
 
 - **The figure is computed, not typed in:** the confirmed server offer against the confirmed catalogue on screen, rounded down, and never above the approved 18% headline ceiling.
 - **Live:** GH₵1 of GH₵4.99 (AirtelTigo 1GB) is 20%, held to "up to 18%".
-- **Nothing is advertised** until the server's catalogue and quote are confirmed. A customer who has used the offer, is holding it on a pending payment, or can't get it (no phone, a shared phone) sees nothing.
+- **Nothing is advertised** until the server's catalogue and quote are confirmed, or when no bundle on screen can take the offer. A customer who has used the offer, is holding it on a pending payment, or can't get it (no phone, a shared phone) sees nothing.
 - **Checkout** is unchanged and remains the only place that shows the exact saving and total.
-- **Lab check:** an early build of the advert asked for a web font that ordinary pages don't otherwise load (+28 KB). It now uses the page's own fonts. The final ordinary-page bytes are in section 10.
+- **Lab check:** an early build of the advert asked for a web font that ordinary pages don't otherwise load (+28 KB). It now uses the page's own fonts.
+- **Final lab A/B** (5-run medians, back to back against `main`):
+
+| Page | KB | Fonts KB | CLS | LCP |
+|---|---|---|---|---|
+| Ordinary homepage, guest | 334 → 335 | 32 → 32 | 0.017 → 0.017 | 2540 → 2516 ms |
+| Ordinary member homepage (new member) | 376 → 379 | 75 → 75 | 0.006 → 0.006 | 2700 → 2784 ms |
+| Data, guest | 334 → 336 | 32 → 32 | **0.117 → 0.000** | 2668 → 2656 ms |
+| Data, guest, in season | 435 → 401 | 113 → 77 | **0.223 → 0.039** | 2684 → 2728 ms |
+
+- **Trade-off:** a new member's homepage now makes two more small requests (the catalogue and the welcome-offer quote) for the chip, about +3 KB. Its LCP moved +84 ms, within this lab's 5–10 % run-to-run noise. Members with orders don't make them.
 
 ## 7. December stacked discount: the 33% check
 
@@ -167,7 +181,7 @@ The Countdown's change is lab noise: its font is identical. Lab figures are not 
 **How the three are now told apart for customers:**
 - **Permanent welcome:** "Up to 18% off your first data bundle".
 - **December campaign:** the existing Christmas tray headline "December Specials · Up to N% off", only while the server applies the campaign. Prices are crossed out against the standard price.
-- **Combined:** new. Only while a campaign the server applies stacks with the welcome benefit, the Welcome card adds "Up to 27% with the December Special" (computed the same way). It shows on both the ordinary advert and the seasonal card.
+- **Combined:** new. Only while a campaign the server applies stacks with the welcome benefit, the Welcome card adds "Up to 27% with the December Special" (computed the same way). It shows on the ordinary homepage card and the seasonal card; the one-line Data and member adverts keep to the welcome figure. In the December window the homepage holds a taller room (200 px) until the catalogue shows whether a December price applies, so the extra line moves nothing either.
 - **Checkout:** already itemises regular price, December Special, welcome benefit, total and saving.
 - **When inactive:** nothing December-related appears, because the server sends no campaign fields.
 
@@ -191,25 +205,47 @@ Nothing in `server/` changed except tests. Nothing in `shared/` changed. Checkou
 
 ## 10. Verification
 
-- **Focused tests:** `mysteryCloseout37.test.ts` (new, 13 tests) and the updated `mysteryCountdown371`, `welcomeOfferCardPricing`, `dataCheckoutRescue` and `ordersTracking362` suites.
+- **Focused tests:** `mysteryCloseout37.test.ts` (new, 14 tests) and the updated `mysteryCountdown371`, `welcomeOfferCardPricing`, `dataCheckoutRescue`, `dataStorePremium36` and `ordersTracking362` suites, with the seasonal suites: 170 of 170.
 - **Full suite:** see the PR.
 - **TypeScript:** passes. **Production build:** passes.
-- **Browser** (`scripts/reviewCloseout37.cjs`, local build and local in-memory API): 14 of 14 checks pass.
-  - Data at six widths for guests, and for an eligible new member.
-  - Homepage guest card at 360 and 1280 px.
+- **Browser** (`scripts/reviewCloseout37.cjs`, local build and local in-memory API): 16 of 16 checks pass.
+  - Data at six widths for guests (including the 44 px tap area and the action wording), and for an eligible new member at 320 and 360 px.
+  - Homepage guest card at 360 and 1280 px: the room held is the room used, it is let go once the server answers, and a December card with the combined line fits the taller room.
   - Member chip at 320 and 390 px.
-  - An ineligible-member check that was skipped: the local API requires a phone at signup.
+  - Customers whose offer is redeemed or who bought before (the server's answer rewritten in the local proxy): nothing on Data or the member homepage.
+  - A guest with the offer switched off: the homepage room closes, with no empty box.
   - The Countdown sound lifecycle in a real Chromium audio context: nothing before the tap; music code fetched on the tap; Music toggle; hidden → suspended → resumed; off; leaving.
-  - The offline sound render.
+  - The offline sound render was run once for the preview file (optional, `CLOSEOUT_SOUND`).
 - **Countdown regression** (`scripts/reviewMysteryCountdown.cjs`): 33 of 38. The five failures are "horizontal overflow" checks that fail identically on a build of unchanged `main` in this sandbox. They are pre-existing, not introduced by this change. The sharing and sound checks pass.
 
-## 11. Remaining limitations
+## 11. Independent review
+
+A separate reviewer read the change and the running build and reported 15 findings, none blocking. Fixed before merge:
+1. The homepage kept a 176 px empty box for guests whenever the answer wasn't `guest`. The room is now held only until the server answers (at most 8 s).
+2. In December the card with the combined line was 23 px taller than its room. The room is now 200 px in the December window, and the card's own minimum height matches its room.
+3. The eligible line was cut off at 320 px, and the combined figure didn't fit the line on tablets. "Ready:" is visual-only below 400 px, and the combined figure is shown on the card only.
+4. The guest button's spoken name didn't match its visible words (WCAG 2.5.3). The visible words are now the name.
+5. The guest button was a 28 px target and said nothing about sign-up on phones. Its tap area is now 44 px, and phones show "sign up".
+6. With no bundle that could take the offer, a vague "welcome saving" was advertised. Nothing is shown then.
+7. A quick on-then-off tap showed "didn't allow sound". Cancelled taps are now ignored.
+8. A broken soundtrack could pass the tests. They now check that the score itself started, a lost-audio return, and a combined figure that is not larger.
+9. A phone that won't restart audio left the button saying "on". It now switches off and says so.
+10. Two timers ran on after the music stopped. They are cleared.
+11. The Countdown's top bar crowded between 420 and 480 px. Icons only below 500 px.
+14. Share-sheet and tab titles didn't match the previews. They now do.
+15. Smaller doc corrections (this document).
+
+Left as they are:
+- **12.** Sound and Music change their label as well as `aria-pressed`, so a screen reader hears the state twice. This is the approved 3.7.1 Sound button's behaviour, which Music copies for consistency; changing both is a small follow-up.
+- **13.** Creative Studio loads the full-range Fraunces under the same family name. Inside one visit, whichever file loads last is used for both, so visiting Creative Studio and then a seasonal page (or the reverse) can switch the seasonal pages' cut (about 7% width at small sizes). Both cuts are the approved typeface. A distinct family name for one of them is a small follow-up.
+
+## 12. Remaining limitations
 
 - **Physical devices:** sound, the serif and the new placements are verified in browser emulation only. The founder should listen on a phone (speaker and earphones, silent switch off) and check iPhone Safari's audio unlock.
 - **Live display:** the new adverts are not verified live until this deploys. Production was read only through public guest requests. Admin-only settings (whether December is saved as enabled, live supplier costs) were not read.
 - **Lab only:** no field data.
 
-## 12. Actions for 3.5 (Codex)
+## 13. Actions for 3.5 (Codex)
 
 1. **Urgent, unchanged:** the MTN duplicate-order privacy fix. Instant Bundle and Airtime `ACTIVE_MTN_ORDER` 409s return another customer's `existingOrderReference` (`server/routes/api.ts`, around lines 562 and 737). This closeout documents it only.
 2. **Mystery Gifts:** the separate Gift Recipients audience (handoff section 6.6.1), with the recipient-safe notifications and the rest of section 6, before any gift is sold.

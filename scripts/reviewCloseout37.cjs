@@ -29,14 +29,15 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const results = [];
 async function check(name, fn) {
   try { await fn(); results.push([true, name]); console.log(`PASS  ${name}`); }
-  catch (e) { results.push([false, name]); console.log(`FAIL  ${name}\n      ${String(e && e.stack || e).split('\n').slice(0, 3).join('\n      ')}`); }
+  catch (e) {
+    results.push([false, name]); console.log(`FAIL  ${name}\n      ${String(e && e.stack || e).split('\n').slice(0, 3).join('\n      ')}`); }
 }
 const ok = (c, m) => { if (!c) throw new Error(m); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* A static server for the build, with /api proxied to the local API. `quoteDelay` holds back the welcome-offer quote,
    so the offer arrives late (the worst case for layout stability). */
-let quoteDelay = 0;
+let quoteDelay = 0, quoteOffer = null; // quoteOffer: fields laid over the server's offer answer (e.g. a used offer)
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, BASE);
   if (url.pathname.startsWith('/api/')) {
@@ -45,7 +46,15 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       if (url.pathname.startsWith('/api/commercial/quote/') && quoteDelay) await sleep(quoteDelay);
       const headers = { ...req.headers, host: new URL(API).host }; delete headers['accept-encoding'];
-      const up = http.request(API + req.url, { method: req.method, headers }, r => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });
+      const rewrite = url.pathname.startsWith('/api/commercial/quote/') && quoteOffer;
+      const up = http.request(API + req.url, { method: req.method, headers }, r => {
+        if (!rewrite) { res.writeHead(r.statusCode, r.headers); return r.pipe(res); }
+        const parts = []; r.on('data', c => parts.push(c));
+        r.on('end', () => {
+          const body = JSON.parse(Buffer.concat(parts).toString() || '{}'); if (body.offer) Object.assign(body.offer, quoteOffer);
+          const out = JSON.stringify(body); const h = { ...r.headers, 'content-length': Buffer.byteLength(out) }; res.writeHead(r.statusCode, h); res.end(out);
+        });
+      });
       up.on('error', () => { res.writeHead(502); res.end(); }); up.end(Buffer.concat(chunks));
     });
     return;
@@ -98,14 +107,21 @@ const overflow = page => page.evaluate(() => document.documentElement.scrollWidt
       const after = await page.evaluate(() => ({ slot: document.querySelector('.mh-ds-offer-slot').getBoundingClientRect().height, hero: document.querySelector('.mh-ds-hero').getBoundingClientRect().height, text: document.querySelector('.mh-ds-offer-slot').textContent, line: (() => { const e = document.querySelector('.mh-wa-text'); return e.scrollWidth - e.clientWidth; })() }));
       ok(/Total shown before you pay/.test(before.text), 'before the answer: the reassurance holds the line: ' + before.text);
       ok(/Up to 18% off your first bundle/.test(after.text), after.text);
+      // Phones say "sign up", wider screens "create a free account": the action is always named on screen.
+      const action = await page.evaluate(() => document.querySelector('.mh-wa-text').innerText);
+      ok(width < 640 ? /· sign up$/.test(action.trim()) : /· create a free account$/.test(action.trim()), 'action shown: ' + action);
       ok(before.slot === 28 && after.slot === 28 && before.hero === after.hero, JSON.stringify({ before, after }));
-      ok(after.line <= 0, 'the offer line is not cut off');
+      ok(after.line <= 0, 'the offer line is not cut off: ' + JSON.stringify(await page.evaluate(() => { const e = document.querySelector('.mh-wa-text'), l = document.querySelector('.mh-wa-line'); return { need: e.scrollWidth, have: e.clientWidth, line: l.getBoundingClientRect().width, slot: document.querySelector('.mh-ds-offer-slot').clientWidth }; })));
       const cls = await shiftTotal(page);
       ok(cls < 0.01, 'layout shift ' + cls.toFixed(4) + ' ' + JSON.stringify(await page.evaluate(() => window.__shifts)));
       ok(await overflow(page) <= 0, 'horizontal overflow');
       ok(errors.length === 0, errors.join('\n'));
       await page.locator('.mh-ds-hero').screenshot({ path: path.join(OUT, `data-guest-${width}.png`) });
       if (width === 390) {
+        // The pill is 28px tall; its tappable area reaches 44px (a tap 7.5px above or below it still opens signup).
+        const hit = await page.evaluate(() => { const b = document.querySelector('.mh-wa-line').getBoundingClientRect(), x = b.left + b.width / 2;
+          return [b.top - 7.5, b.bottom + 7.5].map(y => { const e = document.elementFromPoint(x, y); return e?.closest('.mh-wa-line') ? 1 : String(e && (e.className || e.tagName)).slice(0, 60); }); });
+        ok(hit.join() === '1,1', 'the tappable area reaches 44px: ' + hit);
         await page.locator('.mh-wa-line').click();
         await page.waitForSelector('[role="dialog"]', { timeout: 4000 });
       }
@@ -113,17 +129,23 @@ const overflow = page => page.evaluate(() => document.documentElement.scrollWidt
     });
   }
 
-  await check('Data, eligible new member: "Ready: up to 18% off your first bundle"; same line height', async () => {
-    quoteDelay = 1200;
-    const { page, context } = await open({ width: 360, height: 740, path: '/data', member: newMember });
-    await page.waitForSelector('.mh-ds-offer-slot .mh-wa-line', { timeout: 10000 });
-    const text = await page.textContent('.mh-ds-offer-slot');
-    ok(/Ready: up to 18% off your first bundle/.test(text), text);
-    ok((await page.evaluate(() => document.querySelector('.mh-ds-offer-slot').getBoundingClientRect().height)) === 28, 'height');
-    const cls = await shiftTotal(page); ok(cls < 0.01, 'cls ' + cls);
-    await page.locator('.mh-ds-hero').screenshot({ path: path.join(OUT, 'data-eligible-360.png') });
-    await context.close();
-  });
+  for (const width of [320, 360]) {
+    await check(`Data, eligible new member, ${width}px: "Ready: up to 18% off your first bundle", whole, same line height`, async () => {
+      quoteDelay = 1200;
+      const { page, context } = await open({ width, height: 740, path: '/data', member: newMember });
+      await page.waitForSelector('.mh-ds-offer-slot .mh-wa-line', { timeout: 10000 });
+      const text = await page.textContent('.mh-ds-offer-slot');
+      ok(/Ready: up to 18% off your first bundle/.test(text), text);
+      const seen = await page.evaluate(() => { const e = document.querySelector('.mh-wa-text'); return { cut: e.scrollWidth - e.clientWidth, ready: document.querySelector('.mh-wa-ready').getBoundingClientRect().width, h: document.querySelector('.mh-ds-offer-slot').getBoundingClientRect().height }; });
+      ok(seen.cut <= 0, 'cut off: ' + JSON.stringify(seen));
+      // Below 400px the tick says "ready" and the word itself is for screen readers only, so the line fits whole.
+      ok(width < 400 ? seen.ready <= 1 : seen.ready > 10, '"Ready:" visible width ' + seen.ready);
+      ok(seen.h === 28, 'height');
+      const cls = await shiftTotal(page); ok(cls < 0.01, 'cls ' + cls);
+      await page.locator('.mh-ds-hero').screenshot({ path: path.join(OUT, `data-eligible-${width}.png`) });
+      await context.close();
+    });
+  }
 
   for (const width of [360, 1280]) {
     await check(`Home, guest, ${width}px: the Welcome Offer card fills its kept room`, async () => {
@@ -136,6 +158,11 @@ const overflow = page => page.evaluate(() => document.documentElement.scrollWidt
       const card = await page.evaluate(() => ({ slot: document.querySelector('.home-welcome-slot').getBoundingClientRect().height, card: document.querySelector('.mh-wa-card').getBoundingClientRect().height, text: document.querySelector('.mh-wa-card').innerText }));
       ok(/UP TO 18% OFF/i.test(card.text) && /For new customers/.test(card.text) && /Create a free account/.test(card.text), card.text);
       ok(card.slot === room, `the room kept (${room}) is the room used (${card.slot}); card ${card.card}`);
+      ok(await page.evaluate(() => !document.querySelector('.home-welcome-slot').hasAttribute('data-reserve')), 'the room is let go once the server has answered');
+      // December: with the combined line, the card still fits the taller room (200px) held for it.
+      const tall = await page.evaluate(() => { const c = document.querySelector('.mh-wa-card'), p = document.createElement('p'); p.className = 'mh-wa-combined'; p.textContent = 'Up to 27% with the December Special';
+        c.querySelector('.mh-wa-big').after(p); const h = c.getBoundingClientRect().height; p.remove(); return h; });
+      ok(tall === 200, 'December card ' + tall + 'px against 200px held');
       const shifts = await page.evaluate(() => window.__shifts.filter(s => s.from.some(f => /home-bundle|home-buy|home-section|home-welcome/.test(String(f)))));
       ok(shifts.length === 0, JSON.stringify(shifts));
       ok(await overflow(page) <= 0, 'overflow');
@@ -164,16 +191,34 @@ const overflow = page => page.evaluate(() => document.documentElement.scrollWidt
     });
   }
 
-  await check('Ineligible member (unknown phone state is not offered): nothing advertised, the line keeps the reassurance', async () => {
-    quoteDelay = 0;
-    // A member with no phone gets `phone_required` from the server: the advert must not show anywhere.
-    const res = await fetch(API + '/api/auth/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'No Phone', email: `closeout-${Date.now()}@example.test`, password: 'closeout-Lab-37!' }) });
-    const body = await res.json();
-    if (!body.token) { console.log('      (skipped: the local API requires a phone at signup)'); return; }
-    const { page, context } = await open({ width: 360, height: 740, path: '/data', member: body });
-    await page.waitForSelector('.mh-ds-tile'); await sleep(2500);
-    ok(!(await page.$('.mh-wa')), 'no advert'); ok(/Total shown before you pay/.test(await page.textContent('.mh-ds-offer-slot')), 'reassurance');
-    await context.close();
+  for (const state of ['redeemed', 'previous_buyer']) {
+    await check(`Customer whose offer is ${state}: nothing advertised on Data or Home, no empty room left`, async () => {
+      quoteDelay = 0; quoteOffer = { state };
+      try {
+        const data = await open({ width: 360, height: 740, path: '/data', member: newMember });
+        await data.page.waitForSelector('.mh-ds-tile'); await sleep(2500);
+        ok(!(await data.page.$('.mh-wa')), 'no advert on Data'); ok(/Total shown before you pay/.test(await data.page.textContent('.mh-ds-offer-slot')), 'reassurance');
+        await data.context.close();
+        const home = await open({ width: 360, height: 760, member: newMember });
+        await home.page.waitForSelector('.member-first .member-order-head', { timeout: 10000 }); await sleep(2500);
+        ok(!(await home.page.$('.mh-wa')), 'no chip on the member homepage');
+        await home.context.close();
+      } finally { quoteOffer = null; }
+    });
+  }
+
+  await check('Guest, Welcome Offer switched off: the homepage room closes once the server answers (no empty box)', async () => {
+    quoteDelay = 800; quoteOffer = { enabled: false };
+    try {
+      const { page, context } = await open({ width: 1280, height: 900 });
+      await page.waitForSelector('.home-welcome-slot');
+      await page.waitForFunction(() => !document.querySelector('.home-welcome-slot')?.hasAttribute('data-reserve'), null, { timeout: 10000 });
+      await sleep(200);
+      const slot = await page.evaluate(() => { const e = document.querySelector('.home-welcome-slot'); return { h: e.getBoundingClientRect().height, display: getComputedStyle(e).display }; });
+      ok(slot.display === 'none' || slot.h === 0, JSON.stringify(slot));
+      ok(!(await page.$('.mh-wa')), 'nothing advertised');
+      await context.close();
+    } finally { quoteOffer = null; }
   });
 
   await check('Countdown: Sound on starts the music only on the tap, Music toggles it, hidden pauses, leaving closes', async () => {

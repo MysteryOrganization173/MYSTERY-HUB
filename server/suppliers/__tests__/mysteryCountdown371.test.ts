@@ -612,7 +612,7 @@ test('sharing: one canonical link, nothing personal, never a claim that it was s
   assert.equal(await shareCountdown(false, nav()), 'unsupported');
   let shared: ShareData | null = null;
   assert.equal(await shareCountdown(false, nav(async d => { shared = d; })), 'opened');
-  assert.deepEqual(shared, { title: 'Countdown to 2027 · Mystery Hub', text: countdownShareText(false), url: COUNTDOWN_URL });
+  assert.deepEqual(shared, { title: 'Counting down to 2027 · Mystery Hub', text: countdownShareText(false), url: COUNTDOWN_URL });
   assert.equal(await shareCountdown(true, nav(async () => { throw Object.assign(new Error('x'), { name: 'AbortError' }); })), 'cancelled');
   assert.equal(await shareCountdown(true, nav(async () => { throw new Error('blocked'); })), 'unsupported');
   for (const file of readdirSync('src/countdown')) assert.doesNotMatch(code(read(path.join('src/countdown', file))), /\bsent\b|delivered/i, file);

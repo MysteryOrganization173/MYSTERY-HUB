@@ -1,5 +1,6 @@
 import type { DataBundle } from '../types';
 import type { WelcomeOffer } from './welcomeOfferPresentation';
+import { DECEMBER_2026_APPROVED_PLAN } from '../../shared/directCampaign';
 
 /*
  * 3.7 closeout: the Welcome Offer is a permanent benefit, so its advertisement no longer lives in seasonal code. The
@@ -70,4 +71,19 @@ export function combinedWelcomeFigure(offer: WelcomeOffer | null, bundles: DataB
   const single = welcomeFigure(offer, bundles, catalogConfirmed);
   if (!best || (single && best.percent <= single.percent)) return null;
   return { percent: best.percent, label: `${NETWORK_LABEL[best.bundle.network] || best.bundle.network} ${best.bundle.dataAmount}`, campaignLabel: best.bundle.priceCampaign!.label };
+}
+
+/**
+ * Whether the Welcome card may carry the combined line, decided before the server has answered so the room held for
+ * the card is the right height: the catalogue on screen already has a stacking campaign price, or today (Accra, which
+ * is UTC all year) falls in the approved December window. It only sizes the reserved room; what is advertised still
+ * comes from combinedWelcomeFigure, so an inactive campaign is never advertised. Once the server's catalogue is
+ * confirmed (which the offer's own read waits for), its prices decide, so the room matches the card that arrives.
+ */
+export function welcomeCombinedLikely(bundles: DataBundle[], catalogConfirmed = false, now: Date = new Date()) {
+  if (bundles.some(bundle => bundle.priceCampaign?.stacksWithWelcome)) return true;
+  // Once the server's catalogue is on screen it decides: no stacking price there, no combined line.
+  if (catalogConfirmed) return false;
+  const today = now.toISOString().slice(0, 10);
+  return today >= DECEMBER_2026_APPROVED_PLAN.startDate && today <= DECEMBER_2026_APPROVED_PLAN.endDate;
 }

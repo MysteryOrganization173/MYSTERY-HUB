@@ -8,7 +8,7 @@ const home = (name: string) => source(`src/components/home/${name}`);
 test('homepage V2 keeps prices and offers on their authoritative sources', () => {
   const data = home('HomeFeaturedData.tsx');
   assert.match(data, /useDirectCatalog\(\)/);
-  assert.match(data, /useWelcomeOffer\(DATA_BUNDLES\)/);
+  assert.match(data, /useWelcomeOffer(State)?\(DATA_BUNDLES\)/);
   assert.match(data, /CompactBundleRow/);
   assert.match(data, /openCheckout\(bundle\)/);
   assert.match(data, /openDataPage\('data', selectedNetwork\)/);

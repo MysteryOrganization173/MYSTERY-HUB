@@ -7,7 +7,7 @@ import { COUNTDOWN_SHARE_AFTER, COUNTDOWN_SHARE_BEFORE, COUNTDOWN_URL, countdown
 import { countdownHead } from '../../../src/utils/socialMetadata.js';
 import { createCountdownSound, moodFor, tickNote, TICK_NOTES } from '../../../src/countdown/sound.js';
 import { SCALE, seeded, startScore } from '../../../src/countdown/score.js';
-import { combinedWelcomeFigure, welcomeFigure, WELCOME_HEADLINE_CEILING } from '../../../src/utils/welcomeAdvert.js';
+import { combinedWelcomeFigure, welcomeCombinedLikely, welcomeFigure, WELCOME_HEADLINE_CEILING } from '../../../src/utils/welcomeAdvert.js';
 import { WelcomeAdvert } from '../../../src/components/offers/WelcomeAdvert.js';
 import { WelcomeCard } from '../../../src/seasonal/christmas/kit/WelcomeCard.js';
 import { COUNTDOWN_SERIF_HREF, SEASONAL_SERIF_HREF } from '../../../src/seasonal/christmas/font.js';
@@ -64,7 +64,7 @@ test('sharing: the link preview says the same, before and after midnight, withou
 /* ───────── 3. Countdown sound ───────── */
 
 /** A Web Audio stand-in that records what is created and scheduled. */
-function fakeAudio(state: { contexts: number; oscillators: number; starts: number[] }, startState = 'running') {
+function fakeAudio(state: { contexts: number; oscillators: number; starts: number[]; resumeTo?: string }, startState = 'running') {
   const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} });
   const node = () => ({ connect(next: unknown) { return next ?? {}; }, disconnect() {} });
   return class FakeContext {
@@ -76,7 +76,7 @@ function fakeAudio(state: { contexts: number; oscillators: number; starts: numbe
     createConvolver() { return { ...node(), buffer: null }; }
     createDynamicsCompressor() { return { ...node(), threshold: param(), ratio: param(), attack: param(), release: param() }; }
     createBuffer(channels: number, length: number) { const data = Array.from({ length: channels }, () => new Float32Array(length)); return { getChannelData: (c: number) => data[c] }; }
-    resume() { this.state = startState; return Promise.resolve(); }
+    resume() { this.state = state.resumeTo ?? startState; return Promise.resolve(); }
     suspend() { return Promise.resolve(); }
     close() { return Promise.resolve(); }
   };
@@ -85,13 +85,19 @@ function fakeAudio(state: { contexts: number; oscillators: number; starts: numbe
 test('sound: nothing is created or loaded before the tap; the music loads only when sound is on and wanted', async () => {
   const state = { contexts: 0, oscillators: 0, starts: [] as number[] };
   let loads = 0;
-  const loader = async () => { loads++; return import('../../../src/countdown/score.js'); };
+  let started: unknown = null;
+  const loader = async () => {
+    loads++;
+    const module = await import('../../../src/countdown/score.js');
+    return { startScore: (...args: Parameters<typeof module.startScore>) => (started = module.startScore(...args)) as ReturnType<typeof module.startScore> };
+  };
   const sound = createCountdownSound({ AudioContext: fakeAudio(state) } as unknown as Window, loader)!;
   sound.tick(5); sound.midnight(); sound.setMood('minute', .5);
   assert.equal(state.contexts, 0); assert.equal(loads, 0, 'no audio and no music code before the tap');
   assert.equal(await sound.enable(), true);
   await new Promise(r => setTimeout(r, 20));
   assert.equal(state.contexts, 1); assert.equal(loads, 1, 'the music is loaded on the tap');
+  assert.ok(started, 'the score itself started (not only the two welcome bells)');
   assert.ok(state.oscillators > 4, 'the soundtrack is playing');
   sound.setMusic(false);
   const before = state.oscillators;
@@ -107,6 +113,22 @@ test('sound: a refused or silent start is reported as off; the music never loads
   const sound = createCountdownSound({ AudioContext: fakeAudio(state, 'suspended') } as unknown as Window, async () => { loads++; return import('../../../src/countdown/score.js'); })!;
   assert.equal(await sound.enable(), false);
   assert.equal(sound.on, false); assert.equal(loads, 0);
+});
+
+test('sound: a browser that will not restart audio after the page comes back reports sound off, honestly', async () => {
+  const state = { contexts: 0, oscillators: 0, starts: [] as number[], resumeTo: undefined as string | undefined };
+  const sound = createCountdownSound({ AudioContext: fakeAudio(state) } as unknown as Window, () => import('../../../src/countdown/score.js'))!;
+  assert.equal(await sound.enable(), true);
+  sound.pause();
+  assert.equal(await sound.resume(), true, 'a normal return keeps sound on');
+  sound.pause(); state.resumeTo = 'suspended';
+  assert.equal(await sound.resume(), false, 'a refused restart is reported');
+  assert.equal(sound.on, false);
+  const page = read('src/countdown/CountdownPage.tsx');
+  assert.match(page, /if \(!still\) \{ setOn\(false\); setNote\('lost'\); \}/);
+  // A start the visitor already cancelled never reports back as "didn't allow sound".
+  assert.match(page, /if \(id !== request\.current\) return;/);
+  sound.close();
 });
 
 test('sound: the final ten seconds climb a scale (never one repeated note); stages map to the score', () => {
@@ -129,6 +151,7 @@ test('score: varied notes from one scale, stops scheduling when held or stopped,
   score.release(); assert.equal(timers.length, 2);
   score.setMood('minute', .5); score.setMood('final'); score.celebrate(); score.setMood('welcome');
   score.stop(); assert.equal(cleared, 2);
+  assert.match(read('src/countdown/score.ts'), /if \(settle\) \{ clearTimeout\(settle\); settle = null; \}/, 'stopping clears the celebration timer');
   // The melody's vocabulary is one pentatonic scale, so no line can clash or sit on one note.
   assert.deepEqual(SCALE, [65, 67, 69, 72, 74, 77, 79, 81, 84]);
   for (const file of ['src/countdown/score.ts', 'src/countdown/sound.ts', 'src/countdown/voices.ts']) {
@@ -190,6 +213,10 @@ test('the 33% check: approved December Data prices plus the welcome benefit reac
   assert.equal(Math.floor((AFA_APPROVED.standardMinor - AFA_APPROVED.campaignMinor) * 100 / AFA_APPROVED.standardMinor), 33, 'AFA Registration 29.99 -> 19.99');
   assert.deepEqual(combinedWelcomeFigure(eligible, decemberCatalogue, true), { percent: 27, label: 'MTN 1GB', campaignLabel: 'December Special' });
   assert.equal(combinedWelcomeFigure(eligible, live, true), null, 'no campaign applied (and while MTN is paused, December applies to nothing)');
+  // A campaign whose combined saving is no larger than the welcome figure alone adds no second line.
+  const small = [bundle('telecel-20gb', 'telecel', '20GB', 19.9, { standardPriceGhc: 20, priceCampaign: { label: 'December Special', stacksWithWelcome: true } })];
+  assert.equal(welcomeFigure(eligible, small, true)!.percent, 5);
+  assert.equal(combinedWelcomeFigure(eligible, small, true), null, 'combined 5% is not larger than 5%');
   const noStack = decemberCatalogue.map(b => (b as { priceCampaign?: object }).priceCampaign ? { ...(b as object), priceCampaign: { label: 'December Special', stacksWithWelcome: false } } : b) as never[];
   assert.equal(combinedWelcomeFigure(eligible, noStack, true), null);
 });
@@ -206,8 +233,17 @@ test('advert: guests are invited, eligible customers are told it is ready, every
   assert.equal(advert('card', guest, live, false), '', 'unconfirmed catalogue');
   assert.equal(advert('card', null), '');
   assert.match(advert('line', guest), /<button type="button" class="mh-wa mh-wa-line is-action"/);
-  assert.match(text(advert('line', eligible)), /Ready: up to 18% off your first bundle/);
-  assert.match(advert('chip', eligible), /Welcome offer, ready on your account: up to 18% off your first data bundle\./);
+  // The words on screen are the words read out, with whose offer it is after them.
+  assert.equal(text(advert('line', eligible)), 'Ready: up to 18% off your first bundle Welcome offer, on your account.');
+  // Wide screens say "create a free account", phones "sign up" (each hidden by CSS where the other shows).
+  assert.equal(text(advert('line', guest)), 'Up to 18% off your first bundle · create a free account sign up Welcome offer for new customers.');
+  assert.match(read('src/components/offers/welcomeAdvert.css'), /\.mh-wa \.mh-wa-wide \{ display: none; \}\n@media \(min-width: 640px\) \{ \.mh-wa \.mh-wa-wide \{ display: inline; \} \.mh-wa \.mh-wa-narrow \{ display: none; \} \}/);
+  assert.doesNotMatch(advert('line', guest), /aria-hidden="true">[^<]*[A-Za-z]/, 'no visible words are hidden from screen readers');
+  assert.equal(text(advert('chip', eligible)), 'Up to 18% off your first bundle , welcome offer ready on your account.');
+  // The one-line variants keep to the welcome figure, even in December.
+  assert.doesNotMatch(advert('line', eligible, decemberCatalogue), /27%/);
+  // No worked-out figure, no advert.
+  for (const variant of ['card', 'line', 'chip'] as const) assert.equal(advert(variant, guest, []), '', `${variant} without a figure`);
   // During December (when MTN sells), the combined figure is named as the campaign's.
   assert.match(text(advert('card', eligible, decemberCatalogue)), /Up to 18% off .* Up to 27% with the December Special/);
   assert.match(text(renderToStaticMarkup(React.createElement(WelcomeCard, { offer: eligible as never, bundles: decemberCatalogue, catalogConfirmed: true }))), /Up to 27% with the December Special/);
@@ -217,8 +253,16 @@ test('advert: guests are invited, eligible customers are told it is ready, every
 test('advert placement: every ordinary surface, year-round, independent of the season', () => {
   const home = read('src/components/home/HomeFeaturedData.tsx');
   assert.match(home, /<WelcomeAdvert variant="card" offer=\{welcomeOffer\}/);
-  assert.match(home, /data-reserve=\{!sessionToken \|\| undefined\}/);
-  assert.match(read('src/components/home/homepage.css'), /\.home-welcome-slot\[data-reserve\] \{ min-height: \d+px; \}/);
+  // Room is held only for a signed-out visitor, only until the server answers, and never longer than 8 seconds.
+  assert.match(home, /const welcomeReserve = !sessionToken && !welcomeSettled && !welcomeWaitOver \?/);
+  assert.match(home, /setWelcomeWaitOver\(true\), 8000\)/);
+  assert.match(home, /data-reserve=\{welcomeReserve\}/);
+  assert.match(read('src/components/home/homepage.css'), /\.home-welcome-slot\[data-reserve\] \{ min-height: 176px; \}\n\.home-welcome-slot\[data-reserve="tall"\] \{ min-height: 200px; \}/);
+  assert.equal(welcomeCombinedLikely(live, false, new Date('2026-11-28T12:00:00Z')), false);
+  assert.equal(welcomeCombinedLikely(live, false, new Date('2026-12-01T00:00:00Z')), true, 'December window, catalogue still loading');
+  assert.equal(welcomeCombinedLikely(live, true, new Date('2026-12-01T00:00:00Z')), false, 'the confirmed catalogue has no December price: no combined line');
+  assert.equal(welcomeCombinedLikely(live, false, new Date('2027-01-05T00:00:00Z')), false);
+  assert.equal(welcomeCombinedLikely(decemberCatalogue, true, new Date('2026-11-28T12:00:00Z')), true, 'a stacking price on screen');
   const member = read('src/components/home/MemberHome.tsx');
   assert.match(member, /welcome:!loading&&!error&&orders\.length===0\?<MemberWelcomeChip\/>:undefined/);
   assert.match(read('src/components/home/MemberHomeView.tsx'), /Start here<\/h2>\{welcome\}<\/div>/);

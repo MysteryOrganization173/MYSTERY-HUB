@@ -12,6 +12,8 @@ export function createWelcomeOfferCache(load: Load, now = Date.now) {
   return {
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     read(owner: string) { return owner === key ? value : null; },
+    /** True once the server has answered (or failed) for this identity: a page can stop holding room for the offer. */
+    settled(owner: string) { return owner === key && checkedAt > 0; },
     refresh(context: WelcomeRead, force = false): Promise<void> {
       if (key !== context.key || force) {
         key = context.key; generation++; controller?.abort(); pending = null; value = null; checkedAt = 0; notify();

@@ -149,6 +149,7 @@ export function startScore(ctx: AudioContext, out: AudioNode, mood: Mood, rand: 
       next += shape.beat; beat++;
     }
   };
+  let settle: ReturnType<typeof setTimeout> | null = null;
   const run = () => { if (!timer && !stopped) { schedule(); timer = setTimer(schedule, 250); } };
   const halt = () => { if (timer) { clearTimer(timer); timer = null; } };
   run();
@@ -174,13 +175,15 @@ export function startScore(ctx: AudioContext, out: AudioNode, mood: Mood, rand: 
       held = [];
       pad(HOME, t, 7, .9, .35);
       current = 'welcome'; shape = SHAPES.welcome; chordIndex = 1; chordAt = t + 7; next = Math.max(next, t + 6);
-      setTimeout(() => { if (stopped) return; celebrating = false; glide(bus.gain, level(), 4); glide(tone.frequency, cutoff(), 5); }, 6500);
+      if (settle) clearTimeout(settle);
+      settle = setTimeout(() => { settle = null; if (stopped) return; celebrating = false; glide(bus.gain, level(), 4); glide(tone.frequency, cutoff(), 5); }, 6500);
     },
     hold: halt,
     release: run,
     stop() {
       if (stopped) return;
       stopped = true; halt();
+      if (settle) { clearTimeout(settle); settle = null; }
       glide(bus.gain, 0.0001, 0.4);
       setTimeout(() => { try { bus.disconnect(); wet.disconnect(); reverb.disconnect(); tone.disconnect(); } catch { /* already gone */ } }, 600);
     },

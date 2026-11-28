@@ -71,6 +71,10 @@
    room from the first paint; a signed-in visitor's slot takes no room unless the card is there. */
 .home-welcome-slot { flex: none; width: min(100%, 300px); }
 .home-welcome-slot[data-reserve] { min-height: 176px; }
+.home-welcome-slot[data-reserve="tall"] { min-height: 200px; }
+/* The card is at least the room held for it, so letting the room go never moves the page by a fraction of a pixel. */
+.home-welcome-slot .mh-wa-card { min-height: 176px; align-content: start; }
+.home-welcome-slot .mh-wa-card:has(.mh-wa-combined) { min-height: 200px; }
 .home-welcome-slot:not([data-reserve]):empty { display: none; }
 .home-bundle-list { display: grid; gap: 8px; margin-top: 12px; }
 .home-bundle-list > div { background: #0a100f; border-color: #1f2c28; }

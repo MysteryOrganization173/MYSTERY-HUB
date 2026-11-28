@@ -22,7 +22,7 @@ export const countdownWhatsappHref = (after: boolean, url = COUNTDOWN_URL) => `h
 /** Must be called directly from a tap. 'opened' only means the share sheet was used, never that anything was sent. */
 export async function shareCountdown(after: boolean, nav: Navigator = navigator, url = COUNTDOWN_URL): Promise<ShareResult> {
   if (!canShareNatively(nav, url)) return 'unsupported';
-  try { await nav.share({ title: after ? 'Welcome 2027 · Mystery Hub' : 'Countdown to 2027 · Mystery Hub', text: countdownShareText(after), url }); return 'opened'; }
+  try { await nav.share({ title: after ? 'Happy New Year 2027 · Mystery Hub' : 'Counting down to 2027 · Mystery Hub', text: countdownShareText(after), url }); return 'opened'; }
   catch (error) { return (error as { name?: string } | null)?.name === 'AbortError' ? 'cancelled' : 'unsupported'; }
 }
 

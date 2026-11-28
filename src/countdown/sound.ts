@@ -29,7 +29,8 @@ export interface CountdownSound {
   tick: (secondsLeft: number) => void;
   midnight: () => void;
   pause: () => void;
-  resume: () => void;
+  /** Resolves false when sound was on but the browser would not start it again (the controller has turned it off). */
+  resume: () => Promise<boolean>;
   close: () => void;
   readonly on: boolean;
   readonly music: boolean;
@@ -109,7 +110,16 @@ export function createCountdownSound(win?: Window, loadScore: () => Promise<Scor
       });
     },
     pause() { hidden = true; score?.hold(); void ctx?.suspend().catch(() => undefined); },
-    resume() { hidden = false; if (!on) return; void ctx?.resume().then(() => score?.release(), () => undefined); },
+    async resume() {
+      hidden = false;
+      if (!on || !ctx) return true;
+      // A phone can refuse to restart audio without a new tap. Then sound is honestly off, not silently "on".
+      try { await ctx.resume(); } catch { /* checked below */ }
+      if (!on || hidden) return true;
+      if (ctx.state !== 'running') { on = false; stopScore(); return false; }
+      score?.release();
+      return true;
+    },
     close() { on = false; stopScore(); void ctx?.close().catch(() => undefined); ctx = null; master = null; },
   };
 }
