@@ -8,7 +8,10 @@ import { directCatalogConfirmed } from './useDirectCatalog';
 const cache = createWelcomeOfferCache((id, token, signal) => commercialRequest('commercial/quote/' + encodeURIComponent(id), token, undefined, signal));
 
 /** Homepage, Data page and their notice consume this same confirmed server eligibility. */
-export function useWelcomeOffer(bundles: DataBundle[]) {
+export function useWelcomeOffer(bundles: DataBundle[]) { return useWelcomeOfferState(bundles).offer; }
+
+/** The offer, plus whether the server has answered for this identity yet (so a page can stop holding room for it). */
+export function useWelcomeOfferState(bundles: DataBundle[]) {
   const { user, sessionToken, orders, activeOrder, isCheckoutOpen, isStatusModalOpen } = useApp();
   const productIds = [...bundles].sort((a, b) => (a.id === 'mtn-1gb' ? -1 : b.id === 'mtn-1gb' ? 1 : b.priceGhc - a.priceGhc)).slice(0, 2).map(bundle => bundle.id);
   const orderState = orders.map(order => `${order.id}:${order.status}:${order.serverStatus}`).join('|');
@@ -19,6 +22,7 @@ export function useWelcomeOffer(bundles: DataBundle[]) {
   const key = JSON.stringify([catalogConfirmed, sessionToken, user?.id, user?.phone, user?.status, user?.mustChangePassword, bundles.map(bundle => [bundle.id, bundle.priceGhc]), isCheckoutOpen, isStatusModalOpen, orderState, activeOrder?.id, activeOrder?.status, activeOrder?.serverStatus]);
   const context = { key, token: sessionToken, productIds: !catalogConfirmed || (sessionToken && (!user || user.mustChangePassword)) ? [] : productIds };
   const offer = useSyncExternalStore(cache.subscribe, () => cache.read(key), () => null);
+  const settled = useSyncExternalStore(cache.subscribe, () => cache.settled(key), () => false);
   useEffect(() => {
     void cache.refresh(context);
     const refresh = () => { void cache.refresh(context, true); };
@@ -36,5 +40,5 @@ export function useWelcomeOffer(bundles: DataBundle[]) {
     document.addEventListener('visibilitychange', onReturn);
     return () => { window.clearInterval(timer); window.removeEventListener('focus', onReturn); document.removeEventListener('visibilitychange', onReturn); };
   }, [key]);
-  return offer;
+  return { offer, settled };
 }

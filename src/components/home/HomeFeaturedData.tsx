@@ -1,6 +1,7 @@
-import {useDirectCatalog} from '../../hooks/useDirectCatalog';
-import {WelcomeOfferNotice} from '../data/WelcomeOfferNotice';
-import {useWelcomeOffer} from '../../hooks/useWelcomeOffer';
+import {directCatalogConfirmed,useDirectCatalog} from '../../hooks/useDirectCatalog';
+import {WelcomeAdvert} from '../offers/WelcomeAdvert';
+import {useWelcomeOfferState} from '../../hooks/useWelcomeOffer';
+import {welcomeCombinedLikely} from '../../utils/welcomeAdvert';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GHANA_NETWORKS } from '../../data/bundles';
@@ -27,8 +28,13 @@ const STEPS = [
 
 export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
-  const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
-  const { openCheckout, openDataPage, setActivePage } = useApp();
+  const {offer:welcomeOffer,settled:welcomeSettled}=useWelcomeOfferState(DATA_BUNDLES);
+  const { openCheckout, openDataPage, setActivePage, openAuth, sessionToken } = useApp();
+  // 3.7 closeout: room for the Welcome card is held only while the server's answer is still coming, and never for
+  // longer than 8 seconds, so a disabled offer or a failed read leaves no empty box behind.
+  const [welcomeWaitOver, setWelcomeWaitOver] = useState(false);
+  useEffect(() => { const timer = window.setTimeout(() => setWelcomeWaitOver(true), 8000); return () => window.clearTimeout(timer); }, []);
+  const welcomeReserve = !sessionToken && !welcomeSettled && !welcomeWaitOver ? (welcomeCombinedLikely(DATA_BUNDLES, directCatalogConfirmed()) ? 'tall' : 'card') : undefined;
   // 3.6.3: the first network open for purchases is shown first; a paused network stays in the switch and explains itself.
   const serviceStatus = useServiceStatus();
   const [selectedNetwork, setSelectedNetwork] = useOpenNetworkChoice<NetworkId>('data', NETWORK_IDS, serviceStatus);
@@ -65,6 +71,12 @@ export const HomeFeaturedData: React.FC = () => {
             <h2 id="popular-data-heading">Popular data bundles</h2>
             <p>Pick a bundle. You confirm the recipient number and total before you pay.</p>
           </div>
+          {/* 3.7 closeout: the year-round Welcome Offer. For a signed-out visitor (the server's guest state whenever the
+              offer is on) its room is kept from the first paint until the server answers, so the card fills it without
+              moving the page. */}
+          <div className="home-welcome-slot" data-reserve={welcomeReserve}>
+            <WelcomeAdvert variant="card" offer={welcomeOffer} bundles={DATA_BUNDLES} catalogConfirmed={directCatalogConfirmed()} onCreateAccount={() => openAuth('signup')} headingId="home-welcome-title" />
+          </div>
         </div>
 
         <div className="home-buy-layout">
@@ -84,8 +96,6 @@ export const HomeFeaturedData: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            <div className="home-welcome-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>
 
             <div className="home-bundle-list">
               {popularBundles.map((b) => (

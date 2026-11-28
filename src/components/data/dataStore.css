@@ -44,7 +44,7 @@
 /* ───────── Title panel ───────── */
 .mh-ds .mh-ds-hero {
   position: relative; overflow: hidden; isolation: isolate;
-  display: grid; grid-template-columns: minmax(0, 1fr) 92px; grid-template-areas: "copy art" "body body" "journey journey"; align-items: center; gap: 0 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 92px; grid-template-areas: "copy art" "offer offer" "body body" "journey journey"; align-items: center; gap: 0 10px;
   padding: 16px 16px 14px; border-radius: 22px; border: 1px solid var(--ds-hero-line);
   background:
     radial-gradient(90% 120% at 100% 0%, var(--ds-hero-glow), transparent 62%),
@@ -88,7 +88,7 @@
 .mh-ds .mh-ds-journey-phone { color: var(--ds-ink); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (min-width: 640px) {
-  .mh-ds .mh-ds-hero { grid-template-columns: minmax(0, 1fr) 190px; grid-template-areas: "copy art" "body art" "journey art"; align-items: start; padding: 26px 26px 20px; }
+  .mh-ds .mh-ds-hero { grid-template-columns: minmax(0, 1fr) 190px; grid-template-areas: "copy art" "offer art" "body art" "journey art"; align-items: start; padding: 26px 26px 20px; }
   .mh-ds .mh-ds-hero-art { width: 190px; margin: 0; align-self: center; }
   .mh-ds .mh-ds-lede { font-size: .9375rem; }
   .mh-ds .mh-ds-assure { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 0; padding: 0; list-style: none; font-size: .8125rem; color: var(--ds-soft); }
@@ -325,10 +325,11 @@
   .mh-ds .mh-ds-tile-foot { padding-top: 10px; }
 }
 
-/* 3.6.2 · The Welcome Offer note sits inside the page margins, between payment recovery and the title panel, as a
-   quiet note in the page's own style (it renders nothing when no offer applies, and then takes no space). */
-.mh-ds .mh-ds-offer:empty { display: none; }
-.mh-ds .mh-ds-offer > div { border-radius: 14px; border-color: color-mix(in srgb, var(--ds-accent) 28%, var(--ds-line)); background: linear-gradient(90deg, color-mix(in srgb, var(--ds-accent) 9%, var(--ds-surface)), var(--ds-surface) 70%); padding: 6px 8px 6px 14px; font-size: .8125rem; line-height: 1.5; }
+/* 3.7 closeout · the line under the store title: a fixed height (the Welcome Offer pill's), holding the offer or a
+   plain reassurance, so the server's answer never moves the page (replaces the 3.6.2 note above the panel). */
+.mh-ds .mh-ds-offer-slot { grid-area: offer; display: flex; align-items: center; min-width: 0; height: 28px; margin-top: 8px; }
+.mh-ds .mh-ds-offer-default { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: .8125rem; line-height: 1.3; color: var(--ds-soft); white-space: nowrap; }
+.mh-ds .mh-ds-offer-default svg { width: 15px; height: 15px; flex: none; color: var(--ds-accent-text); }
 
 /* 3.6.3 · a network under maintenance: a small amber marker on its chip (the chip stays selectable and explains itself). */
 .mh-ds .mh-ds-net-paused { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; margin-left: 4px; border-radius: 99px; background: #f2c46d; box-shadow: 0 0 0 2px #f2c46d33; }

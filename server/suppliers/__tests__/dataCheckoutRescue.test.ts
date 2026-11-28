@@ -59,9 +59,9 @@ test('discount and authoritative quote contract remain intact',()=>{
   assert.match(checkout,/onClick=\{\(\)=>setEditingReceipt\(true\)\}/);
 });
 test('customer Welcome Offer copy hides internal eligibility reasons',()=>{
-  const notice=source('src/components/data/WelcomeOfferNotice.tsx');
+  const notice=source('src/components/offers/WelcomeAdvert.tsx');
   for(const text of ['unique Ghana phone','canonical phone','duplicate account','anti-abuse','eligibility identity','account binding','fraud control','Guest purchases stay at regular price']) assert.ok(!(notice+checkout).includes(text),text);
-  assert.match(notice,/\['guest','eligible'\]/);
+  assert.match(notice,/\['guest', ?'eligible'\]/);
   assert.match(checkout,/Add your phone in Account to check your Welcome Offer/);
 });
 test('MTN notice appears once at network level with caveats in disclosure',()=>{

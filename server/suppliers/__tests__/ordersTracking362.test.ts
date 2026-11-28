@@ -339,11 +339,14 @@ test('motion is finite, transform and opacity only, and reduced motion holds it 
 
 /* ───────── The Data page's Welcome Offer, inside the page margins ───────── */
 
-test('the Welcome Offer notice sits inside the Data page container, after payment recovery and before the title panel', () => {
+test('the Welcome Offer sits in the title panel under the store title, after payment recovery, in a fixed-height line (3.7 closeout)', () => {
   const page = source('src/components/data/DataPage.tsx');
   const root = page.indexOf('<div className="mh-ds py-4'), container = page.indexOf('<div className="max-w-7xl mx-auto', root);
-  const banner = page.indexOf('<PendingPaymentBanner />', container), notice = page.indexOf('<WelcomeOfferNotice offer={welcomeOffer}/>', container), hero = page.indexOf('<DataStoreHero', container);
-  assert.ok(root > 0 && container > root && banner > container && notice > banner && hero > notice, 'container > recovery > offer > title');
-  assert.equal((page.match(/<WelcomeOfferNotice /g) || []).length, 1);
-  assert.match(source('src/components/data/dataStore.css'), /\.mh-ds \.mh-ds-offer:empty \{ display: none; \}/, 'no empty gap when no offer applies');
+  const banner = page.indexOf('<PendingPaymentBanner />', container), hero = page.indexOf('<DataStoreHero', container);
+  assert.ok(root > 0 && container > root && banner > container && hero > banner, 'container > recovery > title panel');
+  assert.match(page.slice(hero, hero + 400), /offer=\{dataProductMode==='data'&&welcomeAdvertShown\(welcomeOffer,directCatalogConfirmed\(\)\)/);
+  assert.doesNotMatch(page, /WelcomeOfferNotice/);
+  const hero2 = source('src/components/data/DataStoreHero.tsx');
+  assert.ok(hero2.indexOf('mh-ds-offer-slot') > hero2.indexOf('id="data-store-title"'), 'below the store title');
+  assert.match(source('src/components/data/dataStore.css'), /\.mh-ds \.mh-ds-offer-slot \{ grid-area: offer; display: flex; align-items: center; min-width: 0; height: 28px;/, 'one fixed height, whatever it holds');
 });

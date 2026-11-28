@@ -75,7 +75,7 @@ function JourneyLine({ mode }: { mode: DataStoreMode }) {
 /** The title panel settles in once per visit; coming back to the page (or a re-render) never replays it. */
 let heroShown = false;
 
-export function DataStoreHero({ mode = 'data' }: { mode?: DataStoreMode }) {
+export function DataStoreHero({ mode = 'data', offer = null }: { mode?: DataStoreMode; offer?: React.ReactNode }) {
   // Read once on mount (a pure initializer, safe under StrictMode); remembered after the panel has been shown.
   const [seen] = useState(() => heroShown);
   useEffect(() => { heroShown = true; }, []);
@@ -95,10 +95,13 @@ export function DataStoreHero({ mode = 'data' }: { mode?: DataStoreMode }) {
         <p className="mh-ds-eyebrow">Data &amp; Airtime</p>
         <h1 id="data-store-title" className="mh-ds-title">Stay connected.</h1>
       </div>
+      {/* 3.7 closeout: one line under the title, always the same height. It holds the Welcome Offer once the server
+          confirms it applies to this visitor, and otherwise a plain reassurance, so no answer ever moves the page and
+          nobody sees an empty gap. */}
+      <div className="mh-ds-offer-slot">{offer || <p className="mh-ds-offer-default"><Receipt aria-hidden="true" />Total shown before you pay</p>}</div>
       <div className="mh-ds-hero-body">
-        <p className="mh-ds-lede">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel.<span className="mh-ds-wide"> Pay with Mobile Money and see the total before you pay.</span></p>
+        <p className="mh-ds-lede">Data, Instant Bundles and airtime for MTN, AirtelTigo and Telecel.</p>
         <ul className="mh-ds-assure" aria-label="How buying works">
-          <li><Receipt aria-hidden="true" />Total shown before you pay</li>
           <li><Smartphone aria-hidden="true" />Mobile Money via Paystack</li>
           <li><ShieldCheck aria-hidden="true" />Track every order</li>
         </ul>

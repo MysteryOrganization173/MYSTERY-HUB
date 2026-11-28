@@ -1,15 +1,15 @@
 import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { ArrowRight, Link2, Maximize2, MessageCircle, RefreshCw, RotateCcw, Share2, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowRight, Link2, Maximize2, MessageCircle, Music, RefreshCw, RotateCcw, Share2, Volume2, VolumeX, X } from 'lucide-react';
 import { useCountdownClock, countdownParts, type ClockView } from '../greetings/countdown';
 import { GREETINGS_MARK } from '../greetings/chrome';
 import { analyticsAllowed, trackExperience } from '../greetings/analytics';
 import { trackGrowth } from '../utils/growthAnalytics';
-import { loadSeasonalSerif } from '../seasonal/christmas/font';
+import { COUNTDOWN_SERIF_HREF, loadSeasonalSerif } from '../seasonal/christmas/font';
 import { Dial, YearMark } from './Dial';
 import { STAGE_ANNOUNCEMENT, isAfter, isCounting, remainingSentence, shownSeconds, stageCopy, stageOf, type Stage } from './stage';
 import { canShareNatively, copyCountdownLink, countdownWhatsappHref, shareCountdown, COUNTDOWN_URL } from './share';
 import { fullscreenAvailable, fullscreenEvents, isFullscreen, keepScreenOn, leaveFullscreen, requestFullscreen } from './immersive';
-import { createCountdownSound, soundSupported, type CountdownSound } from './sound';
+import { createCountdownSound, moodFor, soundSupported, type CountdownSound } from './sound';
 
 /**
  * Mystery Countdown (/countdown): an original, shareable New Year countdown to midnight in Accra.
@@ -46,7 +46,7 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
   const root = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    loadSeasonalSerif();
+    loadSeasonalSerif(COUNTDOWN_SERIF_HREF);
     setMotion(!reducedMotion());
     const theme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
     const before = theme?.content;
@@ -82,10 +82,13 @@ export function CountdownExperience({ view, retry }: { view: ClockView; retry: (
     if (words && (stage !== 'welcome' || live)) setAnnouncement(words);
   }, [stage, live]);
 
-  useEffect(() => { if (isAfter(stage)) document.title = stage === 'welcome' ? 'Welcome 2027 · Happy New Year — Mystery Hub' : '2027 began in Accra — Mystery Hub'; }, [stage]);
+  useEffect(() => { if (isAfter(stage)) document.title = stage === 'welcome' ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : '2027 began in Accra — Mystery Hub'; }, [stage]);
 
   const sound = useCountdownSound();
-  useEffect(() => { if (stage === 'final' && seconds > 0) sound.instance?.tick(seconds === 1); }, [stage, seconds, sound.instance]);
+  useEffect(() => { if (stage === 'final' && seconds > 0) sound.instance?.tick(seconds); }, [stage, seconds, sound.instance]);
+  // The music follows the stage; in the final minute its build follows the seconds (a call per second, nothing more).
+  const buildProgress = stage === 'minute' ? Math.round(((60 - seconds) / 50) * 20) / 20 : 0;
+  useEffect(() => { sound.instance?.setMood(moodFor(stage), buildProgress); }, [stage, buildProgress, sound.instance, sound.on]);
   useEffect(() => { if (celebration) sound.instance?.midnight(); }, [celebration, sound.instance]);
 
   const replay = useCallback(() => setCelebration('replay'), []);
@@ -227,28 +230,62 @@ const Actions = memo(function Actions({ stage, replay, playing }: { stage: Stage
 
 /* ───────────────────────── Top bar: identity, sound and the immersive view ───────────────────────── */
 
+type SoundNote = '' | 'music' | 'effects' | 'blocked' | 'lost';
+
 function useCountdownSound() {
   const [instance, setInstance] = useState<CountdownSound | null>(null);
   const [on, setOn] = useState(false);
+  const [music, setMusicState] = useState(true);
+  const [note, setNote] = useState<SoundNote>('');
   const supported = useRef(false);
   useEffect(() => {
     supported.current = soundSupported();
     if (!supported.current) return;
+    // Nothing is created here: the audio context (and the music's code) only once the visitor taps.
     const created = createCountdownSound();
     setInstance(created);
-    const onVisible = () => { if (document.visibilityState === 'hidden') created?.pause(); else created?.resume(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') { created?.pause(); return; }
+      void created?.resume().then(still => { if (!still) { setOn(false); setNote('lost'); } });
+    };
+    const onHide = () => created?.pause();
     document.addEventListener('visibilitychange', onVisible);
-    return () => { document.removeEventListener('visibilitychange', onVisible); created?.close(); };
+    window.addEventListener('pagehide', onHide);
+    return () => { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('pagehide', onHide); created?.close(); };
   }, []);
+  // The note under the controls says what is playing, then steps aside.
+  useEffect(() => {
+    if (!note) return;
+    const timer = window.setTimeout(() => setNote(''), note === 'blocked' || note === 'lost' ? 6000 : 4000);
+    return () => window.clearTimeout(timer);
+  }, [note]);
+  // Each tap is numbered, so a start the visitor has already cancelled never reports back.
+  const request = useRef(0);
   const toggle = useCallback(() => {
     if (!instance) return;
-    if (instance.on) { instance.disable(); setOn(false); return; }
+    const id = ++request.current;
+    if (instance.on) { instance.disable(); setOn(false); setNote(''); return; }
     setOn(true);
-    // The browser may still refuse to start audio; the button then says so by switching back off.
-    void instance.enable().then(started => setOn(started));
+    // The browser may still refuse to start audio; the button then switches back off and the note says so.
+    void instance.enable().then(started => {
+      if (id !== request.current) return;
+      setOn(started); setNote(started ? (instance.music ? 'music' : 'effects') : 'blocked');
+    });
   }, [instance]);
-  return { instance, on, toggle };
+  const toggleMusic = useCallback(() => {
+    if (!instance) return;
+    const next = !instance.music;
+    instance.setMusic(next); setMusicState(next); setNote(next ? 'music' : 'effects');
+  }, [instance]);
+  return { instance, on, music, note, toggle, toggleMusic };
 }
+
+const SOUND_NOTE: Record<Exclude<SoundNote, ''>, string> = {
+  music: 'Music on. Midnight has its own sounds.',
+  effects: 'Music off. Countdown sounds stay on.',
+  blocked: 'This browser didn’t allow sound. Try again.',
+  lost: 'The browser stopped sound. Tap Sound again.',
+};
 
 function TopBar({ sound, immersive, onImmersive, root }: { sound: ReturnType<typeof useCountdownSound>; immersive: boolean; onImmersive: (on: boolean) => void; root: RefObject<HTMLElement | null> }) {
   const enterButton = useRef<HTMLButtonElement>(null), exitButton = useRef<HTMLButtonElement>(null);
@@ -304,15 +341,23 @@ function TopBar({ sound, immersive, onImmersive, root }: { sound: ReturnType<typ
       )}
       <div className="cd-tools">
         {sound.instance && (
-          <button type="button" className="cd-tool" onClick={sound.toggle} aria-pressed={sound.on}>
+          <button type="button" className="cd-tool" onClick={sound.toggle} aria-pressed={sound.on} title="Music and countdown sounds">
             {sound.on ? <Volume2 className="cd-icon" aria-hidden="true" /> : <VolumeX className="cd-icon" aria-hidden="true" />}
             <span className="cd-tool-label">{sound.on ? 'Sound on' : 'Sound off'}</span>
+          </button>
+        )}
+        {/* Only while sound is on: the background music can be turned off on its own (countdown sounds stay). */}
+        {sound.instance && sound.on && (
+          <button type="button" className="cd-tool" onClick={sound.toggleMusic} aria-pressed={sound.music} title="Background music">
+            <Music className="cd-icon" aria-hidden="true" />
+            <span className="cd-tool-label">{sound.music ? 'Music on' : 'Music off'}</span>
           </button>
         )}
         {immersive
           ? <button ref={exitButton} type="button" className="cd-tool" onClick={exit}><X className="cd-icon" aria-hidden="true" /><span className="cd-tool-label">Exit full screen</span></button>
           : <button ref={enterButton} type="button" className="cd-tool" onClick={() => void enter()}><Maximize2 className="cd-icon" aria-hidden="true" /><span className="cd-tool-label">Full screen</span></button>}
       </div>
+      <p className="cd-sound-note" role="status">{sound.note ? SOUND_NOTE[sound.note] : ''}</p>
     </div>
   );
 }

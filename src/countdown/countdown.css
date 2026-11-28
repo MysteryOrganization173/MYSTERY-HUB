@@ -53,7 +53,7 @@
 /* ───────── Shell ───────── */
 .cd-shell { position: relative; width: 100%; max-width: 760px; min-height: 100vh; min-height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; align-items: center;
   padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-.cd-topbar { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: opacity .8s ease; }
+.cd-topbar { position: relative; width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: opacity .8s ease; }
 .cd-page[data-stage="final"] .cd-topbar, .cd-page[data-stage="minute"] .cd-topbar { opacity: .55; }
 .cd-mark { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px 0 4px; border-radius: 999px; color: var(--cd-text-2); text-decoration: none;
   font: 600 .78rem/1 var(--cd-display); letter-spacing: .06em; }
@@ -64,7 +64,11 @@
   -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: background-color .2s ease, color .2s ease; }
 .cd-tool:hover { color: var(--cd-ivory); background: #ffffff14; }
 .cd-tool[aria-pressed="true"] { color: var(--cd-gold-2); border-color: #e3c27a55; }
-@media (max-width: 419px) {
+/* 3.7 closeout: what the sound is doing, for a few seconds after a change. Out of the flow, so nothing moves. */
+.cd-sound-note { position: absolute; top: 100%; right: 0; z-index: 2; max-width: 100%; margin: 0; pointer-events: none; white-space: nowrap;
+  font: 500 .75rem/1.4 var(--cd-display); color: var(--cd-text-2); }
+.cd-sound-note:not(:empty) { padding: 3px 10px; border-radius: 999px; background: #0b1030e6; border: 1px solid #ffffff1a; }
+@media (max-width: 499px) {
   .cd-tool { padding: 0; }
   .cd-tool-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
