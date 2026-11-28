@@ -374,7 +374,7 @@ async function shot(page, name) { await page.evaluate(() => document.fonts.ready
     ok((await a.page.evaluate(() => navigator.clipboard.readText())) === 'https://mysterybundlehub.com/countdown', 'clipboard');
     const wa = a.page.locator('a:has-text("WhatsApp")');
     const href = await wa.getAttribute('href');
-    ok(href === `https://wa.me/?text=${encodeURIComponent('Counting down to 2027 with Mystery Hub. Join me for midnight in Accra: https://mysterybundlehub.com/countdown')}`, href);
+    ok(href === `https://wa.me/?text=${encodeURIComponent('Counting down to 2027 with Mystery Hub! ✨\nAnother year, another chance to make beautiful memories. Let’s welcome 2027 together! 🥂💚\nhttps://mysterybundlehub.com/countdown')}`, href);
     ok((await wa.getAttribute('target')) === '_blank' && /noopener/.test(await wa.getAttribute('rel')), 'opens WhatsApp separately');
     ok(!/\bsent\b/i.test(await a.page.textContent('body')), 'no "sent"');
     await a.context.close();

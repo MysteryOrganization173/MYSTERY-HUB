@@ -1,5 +1,5 @@
-import {useDirectCatalog} from '../../hooks/useDirectCatalog';
-import {WelcomeOfferNotice} from '../data/WelcomeOfferNotice';
+import {directCatalogConfirmed,useDirectCatalog} from '../../hooks/useDirectCatalog';
+import {WelcomeAdvert} from '../offers/WelcomeAdvert';
 import {useWelcomeOffer} from '../../hooks/useWelcomeOffer';
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -28,7 +28,7 @@ const STEPS = [
 export const HomeFeaturedData: React.FC = () => {
   const DATA_BUNDLES=useDirectCatalog();
   const welcomeOffer=useWelcomeOffer(DATA_BUNDLES);
-  const { openCheckout, openDataPage, setActivePage } = useApp();
+  const { openCheckout, openDataPage, setActivePage, openAuth, sessionToken } = useApp();
   // 3.6.3: the first network open for purchases is shown first; a paused network stays in the switch and explains itself.
   const serviceStatus = useServiceStatus();
   const [selectedNetwork, setSelectedNetwork] = useOpenNetworkChoice<NetworkId>('data', NETWORK_IDS, serviceStatus);
@@ -65,6 +65,11 @@ export const HomeFeaturedData: React.FC = () => {
             <h2 id="popular-data-heading">Popular data bundles</h2>
             <p>Pick a bundle. You confirm the recipient number and total before you pay.</p>
           </div>
+          {/* 3.7 closeout: the year-round Welcome Offer. For a signed-out visitor (the server's guest state whenever the
+              offer is on) its room is kept from the first paint, so the server's answer fills it without moving the page. */}
+          <div className="home-welcome-slot" data-reserve={!sessionToken || undefined}>
+            <WelcomeAdvert variant="card" offer={welcomeOffer} bundles={DATA_BUNDLES} catalogConfirmed={directCatalogConfirmed()} onCreateAccount={() => openAuth('signup')} headingId="home-welcome-title" />
+          </div>
         </div>
 
         <div className="home-buy-layout">
@@ -84,8 +89,6 @@ export const HomeFeaturedData: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            <div className="home-welcome-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>
 
             <div className="home-bundle-list">
               {popularBundles.map((b) => (

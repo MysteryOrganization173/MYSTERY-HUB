@@ -59,6 +59,8 @@
 /* Order spotlight: one card whose voice follows the server status. */
 .member-order { display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-panel); border: 1px solid var(--mh-line); background: var(--mh-surface); min-width: 0; }
 .member-order-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+/* 3.7 closeout: the first-purchase heading row is as tall as the Welcome Offer chip, with or without it. */
+.member-first .member-order-head { min-height: 24px; }
 .member-order-head h2 { display: flex; align-items: center; gap: 6px; font-size: .8125rem; font-family: var(--font-body); font-weight: 700; color: var(--mh-text-2); letter-spacing: 0; }
 .member-order-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: #0f2a3a; color: #9fd8ff; }
 .member-order-body { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }

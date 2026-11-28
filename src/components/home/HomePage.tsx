@@ -1,5 +1,6 @@
 import React from 'react';
 import './homepage.css';
+import '../offers/welcomeAdvert.css';
 import { useApp } from '../../context/AppContext';
 import { Hero } from './Hero';
 import { QuickServicesBar } from './QuickServicesBar';

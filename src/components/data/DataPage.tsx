@@ -3,8 +3,8 @@ import { BUSINESS_CONFIG } from '../../config/business';
 import { Money } from '../purchase/Money';
 import { useTapFeedback } from '../../hooks/useTapFeedback';
 import { formatGhanaPhone, isCompleteGhanaPhone } from '../../utils/checkoutRecovery';
-import {useDirectCatalog} from '../../hooks/useDirectCatalog';
-import {WelcomeOfferNotice} from './WelcomeOfferNotice';
+import {directCatalogConfirmed,useDirectCatalog} from '../../hooks/useDirectCatalog';
+import {WelcomeAdvert,welcomeAdvertShown} from '../offers/WelcomeAdvert';
 import {useWelcomeOffer} from '../../hooks/useWelcomeOffer';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -13,6 +13,7 @@ import { NetworkId, DataBundle } from '../../types';
 import { DataBundleTile, TILE_NETWORK_COLOR } from './DataBundleTile';
 import { DataStoreHero } from './DataStoreHero';
 import './dataStore.css';
+import '../offers/welcomeAdvert.css';
 import { PendingPaymentBanner } from '../checkout/PendingPaymentBanner';
 import { InstantBundlesCatalog } from './InstantBundlesCatalog';
 import { smoothScrollToElement, revealPressedChip, revealFocusedChip } from '../../utils/scroll';
@@ -81,6 +82,7 @@ export const DataPage: React.FC = () => {
     setDataNetwork: setActiveNetwork,
     setActivePage,
     user,
+    openAuth,
   } = useApp();
   const season = useSeason();
 
@@ -390,10 +392,10 @@ export const DataPage: React.FC = () => {
     <div className="mh-ds py-4 sm:py-8 text-slate-100" {...dataStoreSeasonAttributes(season)}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
         <PendingPaymentBanner />
-        {/* 3.6.2: inside the page margins, after payment recovery and before the title panel. */}
-        {dataProductMode==='data'&&<div className="mh-ds-offer"><WelcomeOfferNotice offer={welcomeOffer}/></div>}
-
-        <DataStoreHero mode={dataProductMode} />
+        {/* 3.7 closeout: the Welcome Offer sits in the title panel's own line under the store title (a slot that keeps
+            its height whatever it holds), after payment recovery, so its server answer never moves the page. */}
+        <DataStoreHero mode={dataProductMode} offer={dataProductMode==='data'&&welcomeAdvertShown(welcomeOffer,directCatalogConfirmed())
+          ?<WelcomeAdvert variant="line" offer={welcomeOffer} bundles={DATA_BUNDLES} catalogConfirmed onCreateAccount={()=>openAuth('signup')}/>:null} />
 
         <div className="space-y-2.5 sm:space-y-3">
           {/* 4 Product Mode Navigation Tabs / Discovery Shortcuts: one sliding indicator carries the active service. */}

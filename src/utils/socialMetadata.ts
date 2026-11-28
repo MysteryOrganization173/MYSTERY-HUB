@@ -97,9 +97,10 @@ export const COUNTDOWN_IMAGE_ALT = '2027 in ivory and gold inside a midnight clo
 export function countdownHead(now: Date = new Date()): SocialHead {
   const passed = now.getTime() >= Date.parse(COUNTDOWN_TARGET);
   return {
-    title: passed ? 'Welcome 2027 · Happy New Year from Accra — Mystery Hub' : 'Countdown to 2027 · Midnight in Accra — Mystery Hub',
-    description: passed ? '2027 began in Accra at midnight on 1 January, Ghana time. Happy New Year from Mystery Hub. Afehyia pa!'
-      : 'Count down to 1 January 2027 with Mystery Hub: a live countdown to midnight in Accra, Ghana time. Share it with the people you’ll celebrate with.',
+    title: passed ? 'Happy New Year 2027 · Afehyia pa! — Mystery Hub' : 'Counting down to 2027 · Midnight in Accra — Mystery Hub',
+    // 3.7 closeout: the same warm words as the countdown's share message (src/countdown/share.ts), without emoji.
+    description: passed ? 'Happy New Year! May 2027 bring you happiness, peace, new opportunities and countless reasons to smile. Afehyia pa!'
+      : 'Another year, another chance to make beautiful memories. Count down to midnight in Accra with Mystery Hub and let’s welcome 2027 together.',
     url: `${PUBLIC_ORIGIN}/countdown`, ...COUNTDOWN_SHARE_IMAGE, imageAlt: COUNTDOWN_IMAGE_ALT, icon: publicImageUrl(BRAND_IMAGE),
   };
 }

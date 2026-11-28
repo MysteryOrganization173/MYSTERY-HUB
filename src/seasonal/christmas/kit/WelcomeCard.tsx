@@ -3,7 +3,7 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { DataBundle } from '../../../types';
 import type { WelcomeOffer } from '../../../utils/welcomeOfferPresentation';
-import { welcomeFigure } from './welcome';
+import { combinedWelcomeFigure, welcomeFigure } from './welcome';
 
 /**
  * The first-purchase invitation: a short advertisement, not an explanation. It shows for the server's `guest` state
@@ -19,6 +19,8 @@ export function WelcomeCard({ offer, bundles, catalogConfirmed, onCreateAccount,
 }) {
   if (!offer?.enabled || !['guest', 'eligible'].includes(offer.state) || !catalogConfirmed) return null;
   const figure = welcomeFigure(offer, bundles, catalogConfirmed);
+  // 3.7 closeout: while a campaign the server applies stacks with the benefit, its combined first-purchase figure too.
+  const combined = combinedWelcomeFigure(offer, bundles, catalogConfirmed);
   const eligible = offer.state === 'eligible';
   return (
     <aside className={`xk-welcome${eligible ? ' is-eligible' : ''}`} aria-labelledby={headingId}>
@@ -27,6 +29,7 @@ export function WelcomeCard({ offer, bundles, catalogConfirmed, onCreateAccount,
         {figure ? <>Up to <b>{figure.percent}%</b> off</> : <>Welcome <b>saving</b></>}
         <span>{figure ? 'Your first data bundle' : 'On your first data bundle'}</span>
       </h3>
+      {combined && <p className="xk-welcome-combined">Up to {combined.percent}% with the {combined.campaignLabel}</p>}
       <p className="xk-welcome-note">{eligible ? 'Ready on your account' : 'For new customers'}</p>
       {!eligible && onCreateAccount && <button type="button" className="xk-welcome-cta" onClick={onCreateAccount}>Create Your Free Account<ArrowRight className="size-4" aria-hidden="true" /></button>}
     </aside>

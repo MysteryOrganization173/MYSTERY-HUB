@@ -53,7 +53,7 @@ It also needs free Greetings to be live first, and 3.5 has to qualify the paymen
 - **The greeting stays free.** There is no greeting fee. The sender pays the bundle's authoritative current price, and Mystery Hub earns its normal Data contribution. The founder funds nothing.
 - **Data only.** No Instant Bundles or Airtime in V1.
 - **The surprise isn't guaranteed, but Mystery Hub never spoils it.** The recipient's network will usually text them when the bundle lands, possibly before they open the link, and the sender is told this before paying. Mystery Hub itself must never text, call or WhatsApp the recipient about the sender's order (section 6.6); that is a launch requirement, not a nice-to-have.
-- **The buyer is the customer.** The recipient is not a Mystery Hub customer because of a gift: support contacts the buyer by receipt email, and the recipient's number is never used for marketing.
+- **The buyer is the customer.** The recipient is not a Mystery Hub customer because of a gift: support contacts the buyer by receipt email. *3.7 closeout (founder clarification, 28 November 2026):* the recipient's number is kept as a legitimate business record in its own **Gift Recipients** audience in Contact Hub (section 6.6.1). It never joins the customer or buyer audiences, and it never receives promotional messages just because someone bought them a gift.
 - **Free is always the default.** The gift choice appears only when a real purchase can succeed, and free is preselected. "Send without a gift" is on every gift screen.
 
 ## 3. Architecture decision
@@ -227,8 +227,18 @@ Both take `Authorization: Greeting <creatorToken>`, plus the member session if s
   - automatic order SMS: `orderRecipients` must not send a recipient-role message (`order_processing`, `order_delivered`, `delivery_attention`) for an order whose id matches a reservation or attached gift. With the gate off there is nothing to check. With it on, a lookup failure skips that one message (towards no spoiler); the guest still has the receipt email and tracking. Members' buyer-role messages go to their own phone, as today;
   - manual transactional SMS in SMS Studio must refuse or warn for a gift order's recipient;
   - Admin orders must label a gift order "Gift: the phone is the recipient's, not the buyer's. Contact the buyer by receipt email." in place of the WhatsApp link to `customer_phone`;
-  - Contact Hub must leave a gift recipient's number out of contact sourcing, so it is never used for marketing.
+  - Contact Hub must place a gift recipient's number in the separate **Gift Recipients** audience (section 6.6.1), never in the registered, guest, payer or ordinary recipient audiences, and never as the buyer's number.
   - The sender note "Mystery Hub won't text them about your order" in `GiftPicker` is true only once all of this exists.
+- **6.6.1 Gift Recipients audience in Contact Hub (3.7 closeout, replaces "leave the number out").** The founder needs to see and manage authorized business records, so a gift recipient is kept, but apart. Required in the authoritative Contact Hub (`server/db/contactHubStore.ts`, `shared/contactHub.ts`, `server/services/contactHubPolicy.ts`); nothing here exists yet, and this release adds no audience control:
+  - **A separate source:** `ContactSource` gains `gift_recipient` (label "Gift Recipients"). It is derived only from `greeting_gifts` joined to a paid direct Data order, and it uses the order's `recipient_phone`. An order with a reservation or attachment never also feeds the ordinary `recipient` or `guest` streams.
+  - **Never the buyer:** the buyer stays `registered` (member) or `payer` (guest, from the existing payer evidence). The recipient's number is never written as, merged into or searched as the buyer's `customer_phone`, and `relationships` shows the link as "gifted by" with the buyer's reference only to authorized Admin roles.
+  - **Provenance:** each row carries `provenance: ['gift_recipient']`, the gift count, first and last gift dates and the networks. It never carries the greeting message, the sender's name as typed, the share link or the creator secret.
+  - **Admin visibility and filtering:** the same Contact Hub RBAC as today (no wider role). A "Gift Recipients" source filter, plus the existing phone, network, date and permission filters. The default "All" view lists them only with their own label, never counted in "registered", "buyers", "repeat" or VIP figures.
+  - **Deduplication:** by canonical phone within the audience. If the same number is also a registered customer or a buyer in its own right, the directory shows both relationships, and the number's own permission and suppression state always wins.
+  - **Export:** allowed under the existing export purposes and audit (`administrative`, `support_notice`), with gift provenance in the file. A `marketing` export, SMS Studio campaign or bulk SMS must exclude `gift_recipient` rows unless that number has its own recorded marketing permission from a relationship of its own; gift provenance is never a permission.
+  - **Withdrawal and suppression:** the existing SMS withdrawal and waitlist unsubscribe apply to the number exactly as for any contact, and a suppressed number is never re-added by a later gift.
+  - **Transactional silence still applies:** Mystery Hub sends no automatic recipient-side message for a gift order (6.6 above). Mystery Hub cannot control the network's own delivery text, and the sender is told so.
+  - **Tests (add to 6.8):** a gift order creates one `gift_recipient` row and no `recipient`, `guest` or buyer row for that number; the buyer row is unchanged; filtering, deduplication across two gifts, a number that is also a customer, an export by purpose (marketing excludes it), a withdrawal and a suppression; RBAC for a non-Contact-Hub role.
 - **Never automatic:**
   - no refund because a greeting was removed or expired;
   - no resubmission of an uncertain order;
@@ -246,7 +256,7 @@ Both take `Authorization: Greeting <creatorToken>`, plus the member session if s
 **6.8 Isolated tests required (disposable PostgreSQL 17, synthetic data only)**
 - **Reserve:** guest and member, a wrong token, a malformed `requestId` (uniform 404), an inactive or paused product, a second reservation for the same greeting or the same key, and a key that already has an order.
 - **Attach:** guest and member attach, a wrong token, a wrong `requestId`, no reservation, another member's order, a different product from the reservation, a wallet-paid order, an unpaid order, a cancelled order, an order older than the reservation, and an order outside 24 hours.
-- **Notifications:** a reserved guest order sends no recipient-role SMS at `submitted`, delivery or attention; a lookup failure skips rather than sends; an ordinary guest order still texts its recipient exactly as today; Admin shows the gift label; Contact Hub leaves the number out.
+- **Notifications:** a reserved guest order sends no recipient-role SMS at `submitted`, delivery or attention; a lookup failure skips rather than sends; an ordinary guest order still texts its recipient exactly as today; Admin shows the gift label; Contact Hub lists the number only under Gift Recipients (6.6.1), never as a customer, buyer or ordinary recipient, and a marketing export leaves it out.
 - **Uniqueness:** a double attach (same key or different key), the same order to two greetings and a second order to one greeting.
 - **Lifecycle:** a revoked greeting, an expired greeting, maintenance cascade, and a missing or busy schema (checkout must keep working).
 - **Recovery:** gate off, gate on with creation off, a lost response retried, and payment success with the browser closed, then attach later.
@@ -333,7 +343,7 @@ It changed nothing and contacted no production host. On the 6,160 combinations, 
 2. **3.5:**
    - merchant-scope confirmation for Data bought from Greetings;
    - the reservation and attach endpoints, table, public read and gate (sections 6.2 to 6.5);
-   - recipient-safe notifications, Admin labelling and Contact Hub exclusion (section 6.6), without which no gift may be sold;
+   - recipient-safe notifications, Admin labelling and the separate Gift Recipients audience in Contact Hub (sections 6.6 and 6.6.1), without which no gift may be sold;
    - the tests in 6.8.
 3. **Founder approval** of the merchant record, then of one controlled real purchase (6.9), then of activation.
 4. **Claude integration release** once 3.5 lands (section 7).

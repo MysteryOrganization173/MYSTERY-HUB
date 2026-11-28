@@ -604,8 +604,9 @@ test('page: accessible structure; announcements once per stage (source pins; spo
 
 test('sharing: one canonical link, nothing personal, never a claim that it was sent', async () => {
   assert.equal(COUNTDOWN_URL, 'https://mysterybundlehub.com/countdown');
-  assert.equal(countdownWhatsappHref(false), `https://wa.me/?text=${encodeURIComponent('Counting down to 2027 with Mystery Hub. Join me for midnight in Accra: https://mysterybundlehub.com/countdown')}`);
-  assert.match(decodeURIComponent(countdownWhatsappHref(true)), /Happy New Year! 2027 has arrived in Accra\. Afehyia pa! https:\/\/mysterybundlehub\.com\/countdown$/);
+  // 3.7 closeout: warmer words (mysteryCloseout37.test.ts checks them); the link still ends the message, once.
+  assert.equal(countdownWhatsappHref(false), `https://wa.me/?text=${encodeURIComponent(`${countdownShareText(false)}\nhttps://mysterybundlehub.com/countdown`)}`);
+  assert.match(decodeURIComponent(countdownWhatsappHref(true)), /Afehyia pa! 💚\nhttps:\/\/mysterybundlehub\.com\/countdown$/);
   assert.doesNotMatch(countdownWhatsappHref(false), /utm_|ref=|\bid=/);
   const nav = (share?: (d: ShareData) => Promise<void>) => ({ share, canShare: () => true } as unknown as Navigator);
   assert.equal(await shareCountdown(false, nav()), 'unsupported');
@@ -624,7 +625,7 @@ test('sound: off until tapped, built in the browser, never a download; quiet whe
   class FakeContext { state = 'suspended'; currentTime = 0; destination = {}; constructor() { created.push('ctx'); } createGain() { return { gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: () => ({}) }; } createOscillator() { return { type: '', frequency: { value: 0 }, connect: () => ({ connect: () => ({}) }), start() {}, stop() {} }; } resume() { this.state = 'running'; return Promise.resolve(); } suspend() { return Promise.resolve(); } close() { return Promise.resolve(); } }
   const sound = createCountdownSound({ AudioContext: FakeContext } as unknown as Window)!;
   assert.equal(sound.on, false);
-  sound.tick(false); sound.midnight();
+  sound.tick(3); sound.midnight();
   assert.equal(created.length, 0, 'nothing is created before the tap');
   assert.equal(await sound.enable(), true);
   assert.equal(sound.on, true);
@@ -661,13 +662,13 @@ test('immersive: unsupported or refused full screen changes nothing; the wake lo
 
 test('link preview: words follow the server clock; the canonical /countdown head is meaningful and indexable', async () => {
   const before = countdownHead(new Date('2026-12-31T22:00:00Z'));
-  assert.equal(before.title, 'Countdown to 2027 · Midnight in Accra — Mystery Hub');
+  assert.equal(before.title, 'Counting down to 2027 · Midnight in Accra — Mystery Hub');
   assert.equal(before.url, 'https://mysterybundlehub.com/countdown');
   assert.equal(before.image, 'https://mysterybundlehub.com/og/mystery-countdown-2027-v1.jpg');
   assert.equal(before.imageWidth, 1200); assert.equal(before.imageHeight, 630);
   assert.ok(before.imageAlt && before.imageAlt.length > 20);
   const after = countdownHead(new Date(T));
-  assert.equal(after.title, 'Welcome 2027 · Happy New Year from Accra — Mystery Hub');
+  assert.equal(after.title, 'Happy New Year 2027 · Afehyia pa! — Mystery Hub');
   assert.doesNotMatch(`${after.title} ${after.description}`, /count down to|live countdown/i);
   for (const route of ['/countdown', '/countdown/', '/COUNTDOWN', '/countdown?utm_source=whatsapp']) {
     const { head, status, customerSite } = await resolvePublicSocialMetadata(route);

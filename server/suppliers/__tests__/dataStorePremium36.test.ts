@@ -205,7 +205,8 @@ test('guests and members: the journey line describes checkout, never chooses a r
   assert.match(hero, /Enter the number you are buying for at checkout\./);
   // Airtime takes its number on the page, so in Airtime mode the line never names a checkout number.
   assert.match(hero, /mode === 'airtime' \? 'Airtime goes to the number you enter below\.'/);
-  assert.match(page, /<DataStoreHero mode=\{dataProductMode\} \/>/);
+  // 3.7 closeout: the hero also carries the Welcome Offer line (mysteryCloseout37.test.ts).
+  assert.match(page, /<DataStoreHero mode=\{dataProductMode\} offer=\{/);
   assert.doesNotMatch(page, /Any Ghana number/);
   // Nothing is shown while the account is still being checked, and nothing is stored.
   assert.match(hero, /if \(isAuthChecking\) return/);

@@ -20,6 +20,8 @@ export interface MemberHomeViewProps {
   promotion?:React.ReactNode;
   /** 3.4.1 Smart Buy Again: the server finds today's version of the order's product, then its review opens (never a payment). */
   buyAgain?:{run:(order:AuthenticatedCustomerOrderDetails)=>void;pending:string|null};
+  /** 3.7 closeout: the year-round Welcome Offer, in the first-purchase card's heading row (renders nothing unless the server says it is ready). */
+  welcome?:React.ReactNode;
 }
 
 /** The Buy again button: the server confirms the product first, so the button says when it is checking. */
@@ -55,9 +57,10 @@ function OrderSpotlight({order,track,reorder,buyAgain}:{order:AuthenticatedCusto
   </section>;
 }
 
-function FirstPurchase({data,airtime}:{data:(network?:NetworkId)=>void;airtime:()=>void}) {
+function FirstPurchase({data,airtime,welcome}:{data:(network?:NetworkId)=>void;airtime:()=>void;welcome?:React.ReactNode}) {
   return <section aria-labelledby="member-order-heading" className="member-order member-first">
-    <div className="member-order-head"><h2 id="member-order-heading"><Sparkles className="size-4" aria-hidden="true"/>Start here</h2></div>
+    {/* The heading row keeps its height with or without the Welcome Offer chip, so its arrival moves nothing. */}
+    <div className="member-order-head"><h2 id="member-order-heading"><Sparkles className="size-4" aria-hidden="true"/>Start here</h2>{welcome}</div>
     <p className="member-first-title">Your first order starts here.</p>
     <p className="member-order-next">Choose a network to see its bundles. After you pay, you can follow the order right here.</p>
     <div className="member-network-picks">{NETWORKS.map(n=><button key={n.id} onClick={()=>data(n.id)} style={{'--network':n.color} as React.CSSProperties}><span aria-hidden="true"/>{n.label}<span className="sr-only"> data bundles</span></button>)}</div>
@@ -72,7 +75,7 @@ export function websiteCard(website:MemberWebsiteSummary|undefined) {
   return {title:'Website Builder',desc:'Create or manage your free website',tag:'Free plan',label:undefined};
 }
 
-export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant,website,promotion,buyAgain}:MemberHomeViewProps) {
+export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,track,actions,assistant,website,promotion,buyAgain,welcome}:MemberHomeViewProps) {
   const {latest,recent,prioritizesActive}=memberOrderSelection(orders);
   const tone=!loading&&!error&&latest?memberOrderTone(latest):null;
   // 3.6.4: the Buy Data tile names only the networks selling now (Service Control Center).
@@ -86,7 +89,7 @@ export function MemberHomeView({name,greeting,orders,loading,error,wallet,retry,
   const spotlight=loading?<section aria-label="Latest order" className="member-order member-order-loading"><p role="status">Loading your orders…</p><span className="member-skeleton" aria-hidden="true"/><span className="member-skeleton is-short" aria-hidden="true"/></section>
     :error?<section aria-label="Latest order" className="member-order"><p role="alert" className="member-order-error">Your orders are unavailable right now.</p><div className="member-order-actions"><button className="mh-button-secondary" onClick={retry}>Try again</button><button className="member-text-link" onClick={actions.orders}>Open My Orders<ArrowRight className="size-4" aria-hidden="true"/></button></div></section>
     :latest?<OrderSpotlight order={latest} track={()=>track(latest)} reorder={reorder} buyAgain={buyAgain}/>
-    :<FirstPurchase data={actions.data} airtime={()=>actions.airtime()}/>;
+    :<FirstPurchase data={actions.data} airtime={()=>actions.airtime()} welcome={welcome}/>;
   const services=[
     {id:'website',title:site.title,desc:site.desc,tag:site.tag,label:site.label,Icon:Globe,action:actions.website},
     {id:'earn',title:'Mystery Earn',desc:'Share your link. Earn when friends’ purchases qualify.',Icon:Gift,action:actions.earn},
