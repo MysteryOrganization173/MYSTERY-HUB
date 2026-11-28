@@ -4,6 +4,7 @@ import { DATA_RESELLER_STARTER_HERO_IMAGE, resolveDataResellerHeroImage } from '
 import type { MarketplaceProduct, PublicWebsiteSite } from '../types/index.js';
 import { websiteLayoutMode } from './websiteLayout.js';
 import { framingRegion, isDefaultFraming, type ImageFraming } from '../../shared/marketplaceImageFraming.js';
+import { COUNTDOWN_TARGET } from '../../shared/mysteryExperiences.js';
 
 // Canonical identity never comes from a request Host, Forwarded header or visitor query string.
 export const PUBLIC_ORIGIN = `https://${BUSINESS_CONFIG.domain}`;
@@ -86,6 +87,21 @@ export const GREETINGS_IMAGE_ALT = 'A wrapped gift with a gold bow: Mystery Gree
 export function greetingsCreatorHead(): SocialHead {
   return { title: 'Mystery Greetings — Wrap a Christmas or New Year greeting', description: 'Write a personal greeting, wrap it as a digital gift and share the link. They tap to open it. No account needed.',
     url: `${PUBLIC_ORIGIN}/greetings`, ...GREETINGS_SHARE_IMAGE, imageAlt: GREETINGS_IMAGE_ALT, icon: publicImageUrl(BRAND_IMAGE), noindex: true };
+}
+
+/** Mystery Countdown link previews (3.7.1): one fixed 1200x630 card drawn from the real Midnight Dial, the same for everyone
+ * and free of any personal data. Before midnight in Accra the words invite people to count down; afterwards they welcome
+ * 2027 and never suggest the countdown is still running. The server's own clock decides, not the request. */
+export const COUNTDOWN_SHARE_IMAGE = { image: `${PUBLIC_ORIGIN}/og/mystery-countdown-2027-v1.jpg`, imageWidth: 1200, imageHeight: 630, imageType: 'image/jpeg' } as const;
+export const COUNTDOWN_IMAGE_ALT = '2027 in ivory and gold inside a midnight clock dial, beside the words Midnight in Accra: the Mystery Hub countdown to 2027';
+export function countdownHead(now: Date = new Date()): SocialHead {
+  const passed = now.getTime() >= Date.parse(COUNTDOWN_TARGET);
+  return {
+    title: passed ? 'Welcome 2027 · Happy New Year from Accra — Mystery Hub' : 'Countdown to 2027 · Midnight in Accra — Mystery Hub',
+    description: passed ? '2027 began in Accra at midnight on 1 January, Ghana time. Happy New Year from Mystery Hub. Afehyia pa!'
+      : 'Count down to 1 January 2027 with Mystery Hub: a live countdown to midnight in Accra, Ghana time. Share it with the people you’ll celebrate with.',
+    url: `${PUBLIC_ORIGIN}/countdown`, ...COUNTDOWN_SHARE_IMAGE, imageAlt: COUNTDOWN_IMAGE_ALT, icon: publicImageUrl(BRAND_IMAGE),
+  };
 }
 
 export const PUBLIC_PAGE_METADATA: Record<string, { title: string; description: string; image?: string; path: string; shareImage?: Pick<SocialHead, 'image' | 'imageWidth' | 'imageHeight' | 'imageType'>; imageAlt?: string }> = {

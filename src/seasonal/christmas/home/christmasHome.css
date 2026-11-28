@@ -68,6 +68,12 @@
 .xh-hero-greeting { margin: 6px 0 0; font: italic 500 clamp(2.1rem, 9.6vw, 4.7rem)/1.02 var(--xh-serif); letter-spacing: -.025em; padding-bottom: .1em;
   background: linear-gradient(100deg, #fff4d6 0%, #f2cd73 34%, #fff1cc 58%, #e3ae4b 82%, #f7dc8f 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* 3.7.1: the Mystery Countdown invitation, from 27 December through New Year's Day only. */
+.xh-hero-countdown { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 2px; padding: 0 14px 0 12px; border-radius: 999px; position: relative; z-index: 3;
+  color: #f6e3b0; text-decoration: none; font: 700 .82rem/1.2 var(--font-heading); letter-spacing: .02em; background: #ffffff0d; border: 1px solid #e6cd944d; }
+.xh-hero-countdown i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: #e6cd94; border-radius: 1px; }
+.xh-hero-countdown:hover { background: #ffffff17; }
+.xh-hero-countdown:focus-visible { outline: 3px solid #f6e3b0; outline-offset: 3px; }
 /* Phones: the compact composition (640 × 354) tucks a little under the greeting, so the scene supports it. */
 .xh-hero-stage { grid-area: stage; position: relative; z-index: 1; margin: -16px -16px 0; aspect-ratio: 640 / 354; }
 .xh-scene { display: block; width: 100%; height: 100%; overflow: visible; }

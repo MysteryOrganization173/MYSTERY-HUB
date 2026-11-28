@@ -1,5 +1,5 @@
 import {ExperienceService} from './experienceService.js';
-import {GREETINGS_SHARE_IMAGE,GREETINGS_IMAGE_ALT,greetingsCreatorHead} from '../../src/utils/socialMetadata.js';
+import {GREETINGS_SHARE_IMAGE,GREETINGS_IMAGE_ALT,greetingsCreatorHead,countdownHead} from '../../src/utils/socialMetadata.js';
 import { MarketplaceStore } from '../db/marketplaceStore.js';
 import { WebsiteStore } from '../db/websiteStore.js';
 import type { PublicWebsiteSite } from '../../src/types/index.js';
@@ -38,6 +38,8 @@ export async function resolvePublicSocialMetadata(requestTarget: string, readers
   }
   // The Mystery Greetings creator: the same generic card whether or not creation is open (the page itself says which).
   if (/^\/greetings\/?$/i.test(path)) return { head: greetingsCreatorHead(), status: 200, customerSite: false };
+  // Mystery Countdown (3.7.1): public and shareable; its words follow the server's clock (before or after Accra midnight).
+  if (/^\/countdown\/?$/i.test(path)) return { head: countdownHead(), status: 200, customerSite: false };
   // Preview query URLs render isolated editor frames, never a public owner/product landing page.
   if (['owner_preview', 'isolated_template_preview', 'preview_template_id', 'editor_channel', 'editor_site'].some(key => url.searchParams.has(key))) {
     return { head: pageIndexingHead(path, url.search), status: 200, customerSite: false };

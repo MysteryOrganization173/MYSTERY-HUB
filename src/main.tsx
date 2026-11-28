@@ -20,9 +20,12 @@ const shortCode=!isolatedTemplateId && window.location.pathname.match(/^\/c\/([^
 // Mystery Greetings: the recipient page (/g/…, the same paths the server answers with greeting metadata) and the creator.
 const greetingPath = /^\/g(?:\/|$)/i.test(window.location.pathname);
 const creatorPath = /^\/greetings\/?$/i.test(window.location.pathname);
+// Mystery Countdown (3.7.1): its own small surface, with the same path rule as the server's head for /countdown.
+const countdownPath = /^\/countdown\/?$/i.test(window.location.pathname);
 const surface: Promise<ReactElement> = shortCode ? import('./components/common/CampaignRedirect').then(({CampaignRedirect})=><CampaignRedirect code={shortCode}/>)
   : greetingPath ? Promise.all([import('./greetings/RecipientPage'), import('./greetings/greetings.css')]).then(([{RecipientPage}]) => <RecipientPage path={window.location.pathname} />)
   : creatorPath ? Promise.all([import('./greetings/CreatorPage'), import('./greetings/greetings.css')]).then(([{CreatorPage}]) => <CreatorPage search={window.location.search} />)
+  : countdownPath ? Promise.all([import('./countdown/CountdownPage'), import('./countdown/countdown.css')]).then(([{CountdownPage}]) => <CountdownPage />)
   : isolatedTemplateId
   ? import('./components/website/IsolatedTemplatePreview').then(({IsolatedTemplatePreview}) => <IsolatedTemplatePreview templateId={isolatedTemplateId} />)
   : siteSlug

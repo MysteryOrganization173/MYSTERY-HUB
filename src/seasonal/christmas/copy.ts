@@ -47,6 +47,21 @@ export function seasonCountdown(status: SeasonStatus): { big: string; small: str
 
 export const isChristmasTime = (status: SeasonStatus) => isChristmasPhase(status.phase) || status.phase === 'before';
 
+/**
+ * Mystery Countdown discovery (3.7.1): a quiet link to /countdown once the pack turns toward New Year (27 December),
+ * through New Year's Day. Never during the Christmas phases, so it never competes with the Christmas homepage, and gone
+ * from 2 January. The page itself is public and works without this link; this only decides where it is suggested.
+ */
+export const COUNTDOWN_HREF = '/countdown';
+export function countdownInvite(phase: SeasonPhase): string | null {
+  switch (phase) {
+    case 'year-end': return 'Watch the countdown to 2027';
+    case 'new-years-eve': return 'Join the countdown to midnight';
+    case 'new-years-day': return 'See Welcome 2027';
+    default: return null;
+  }
+}
+
 export type SeasonPage =
   | 'data' | 'marketplace' | 'creative' | 'website' | 'services' | 'afa' | 'checkers'
   | 'help' | 'about' | 'orders' | 'app' | 'earn' | 'wallet';

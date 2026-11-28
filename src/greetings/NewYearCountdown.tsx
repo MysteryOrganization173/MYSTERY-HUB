@@ -4,6 +4,7 @@ import { countdownParts, useNewYearCountdown } from './countdown';
 /**
  * A quiet card under a New Year greeting (shown only after the reveal, so it never interrupts it). Server time, no
  * drift, stops at zero. It is a timer for sighted readers; screen readers get one summary that changes each minute.
+ * It shares its engine with the standalone Mystery Countdown (/countdown), which it links to while counting.
  */
 export function NewYearCountdown({ onShown }: { onShown?: () => void }) {
   const view = useNewYearCountdown(true);
@@ -21,6 +22,8 @@ export function NewYearCountdown({ onShown }: { onShown?: () => void }) {
         {cells.map(([value, label]) => <span key={label} className="mg-countdown-cell"><b>{String(value).padStart(2, '0')}</b><span>{label}</span></span>)}
       </div>
       <p className="mg-sr">{p.days} days, {p.hours} hours and {p.minutes} minutes until midnight on 1 January 2027 in Accra.</p>
+      {/* 3.7.1: the full Mystery Countdown, a plain link (its own small page), offered only while there is a countdown. */}
+      <a className="mg-countdown-link" href="/countdown">Watch the full countdown<span aria-hidden="true">→</span></a>
     </section>
   );
 }

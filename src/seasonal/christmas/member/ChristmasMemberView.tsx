@@ -10,7 +10,7 @@ import { memberOrderLabel, memberOrderNext, memberOrderSelection, memberOrderSte
 import { NETWORKS, buyAgainButton, orderTitle, websiteCard, type MemberHomeViewProps } from '../../../components/home/MemberHomeView';
 import { ProductPhoto } from '../../../components/marketplace/MarketplaceMedia';
 import { categoryIconKey } from '../../../utils/marketplaceBrowse';
-import { isChristmasTime, seasonCountdown } from '../copy';
+import { COUNTDOWN_HREF, countdownInvite, isChristmasTime, seasonCountdown } from '../copy';
 import { AfaArt, EarnArt, MarketArt } from '../home/homeArt';
 import { press, pressEnd } from '../kit/motion';
 import { GreetingsPreview } from '../kit/GreetingsPreview';
@@ -127,6 +127,7 @@ const SITE_ACTION = { none: 'Start building', draft: 'Continue editing', publish
 export function ChristmasMemberView({ name, greeting, orders, loading, error, wallet, retry, track, actions, assistant, website, promotion, buyAgain, status, welcome, market, greetings = GREETINGS_COMING_SOON, rootRef }: ChristmasMemberViewProps) {
   const christmas = isChristmasTime(status);
   const { big, small } = seasonCountdown(status);
+  const invite = countdownInvite(status.phase);
   // 3.6.4: the Buy Data tile names only the networks selling now (Service Control Center).
   const serviceStatus = useServiceStatus();
   const dataNetworks = openNetworksLabel('data', serviceStatus);
@@ -160,6 +161,7 @@ export function ChristmasMemberView({ name, greeting, orders, loading, error, wa
               <p className="xm-welcome-sub">{subline}</p>
               {/* When an order needs the customer, that sentence is the last word here: no seasonal line after it. */}
               {tone !== 'attention' && <p className="xm-welcome-season">{MEMBER_LINE[status.phase]}</p>}
+              {tone !== 'attention' && invite && <a className="xm-countdown-link" href={COUNTDOWN_HREF}>{invite}<ArrowRight className="size-4" aria-hidden="true" /></a>}
             </div>
             <div className="xm-welcome-gift">
               <span className="xm-gift" onPointerDown={giftPress} onAnimationEnd={pressEnd} aria-hidden="true">

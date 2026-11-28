@@ -6,7 +6,7 @@ import { useApp } from '../../../context/AppContext';
 import { BUSINESS_CONFIG } from '../../../config/business';
 import { greetingCreateLink, type GreetingsEntry, type SeasonPhase, type SeasonStatus } from '../../../../shared/seasonal';
 import { useSeason } from '../../SeasonProvider';
-import { isChristmasTime, seasonCountdown } from '../copy';
+import { COUNTDOWN_HREF, countdownInvite, isChristmasTime, seasonCountdown } from '../copy';
 import { loadSeasonalSerif } from '../font';
 import { HeroScene } from './heroArt';
 import { AfaArt, AirtimeArt, Bow, DataArt, EarnArt, EnvelopeBack, EnvelopeFront, FlapInside, FlapOutside, HangingTag, MarketArt, ParcelStack, Peg, TwineBow, WebArt } from './homeArt';
@@ -93,6 +93,7 @@ function Hero({ status }: { status: SeasonStatus }) {
   }, [settled]);
   const words = heroWords(status.phase);
   const { big, small } = seasonCountdown(status);
+  const invite = countdownInvite(status.phase);
   const go = (page: 'website' | 'data') => (e: React.MouseEvent) => { if (!plain(e)) return; e.preventDefault(); setActivePage(page); };
   return (
     <section ref={ref} className="xh-hero" data-phase={status.phase} data-xh-settled={settled ? '' : undefined} aria-labelledby="xh-hero-title">
@@ -101,6 +102,7 @@ function Hero({ status }: { status: SeasonStatus }) {
         <div className="xh-hero-greet">
           <p className="xh-hero-kicker"><span lang="ak">Afehyia pa</span><i aria-hidden="true" />{words.kicker}</p>
           <p className="xh-hero-greeting">{words.greeting}</p>
+          {invite && <a className="xh-hero-countdown" href={COUNTDOWN_HREF}><i aria-hidden="true" />{invite}<ArrowRight className="w-4 h-4" aria-hidden /></a>}
         </div>
         <div className="xh-hero-stage">
           <HeroScene phase={status.phase} countBig={big} countSmall={small} layout={compact ? 'compact' : 'wide'} />
