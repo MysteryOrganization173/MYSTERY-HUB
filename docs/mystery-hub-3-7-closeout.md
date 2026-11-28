@@ -1,6 +1,6 @@
 # Mystery Hub 3.7 closeout · founder refinements
 
-The founder accepted Releases A (Countdown 3.7.1), B (Mystery Gifts 3.7.2) and C (Performance & Mobile 3.7.3) on 28 November 2026, subject to the documented physical-device and production-verification limits, and asked for ten focused refinements in one closeout PR. Baseline: `main` at `6f43f58`.
+The founder accepted Releases A (Countdown 3.7.1), B (Mystery Gifts 3.7.2) and C (Performance & Mobile 3.7.3) on 28 November 2026, subject to the documented physical-device and production-verification limits, and asked for ten focused refinements in one closeout PR. Baseline: `main` at `6f43f58`, then brought up to date with `9835137` (the MTN conflict privacy fix, PR #159) before merging.
 
 No production setting, price, campaign, feature gate, service control, payment, supplier purchase, refund or broadcast was changed or started. MTN purchasing stays paused. Mystery Gifts stays dormant.
 
@@ -158,6 +158,7 @@ The Countdown's change is lab noise: its font is identical. Lab figures are not 
 | Data, guest | 334 → 336 | 32 → 32 | **0.117 → 0.000** | 2668 → 2656 ms |
 | Data, guest, in season | 435 → 401 | 113 → 77 | **0.223 → 0.039** | 2684 → 2728 ms |
 
+- **Re-run after the review fixes** (same method, back to back against `main`): ordinary homepage guest 334 → 336 KB, CLS 0.017 → 0.017, LCP 2436 → 2492 ms; new member 376 → 380 KB, CLS 0.006 → 0.006, LCP 2628 → 2668 ms; Data guest 334 → 336 KB, **CLS 0.117 → 0.000**, LCP 2608 → 2632 ms. Fonts unchanged everywhere. The LCP differences (1–2 %) are within this lab's noise.
 - **Trade-off:** a new member's homepage now makes two more small requests (the catalogue and the welcome-offer quote) for the chip, about +3 KB. Its LCP moved +84 ms, within this lab's 5–10 % run-to-run noise. Members with orders don't make them.
 
 ## 7. December stacked discount: the 33% check
@@ -247,7 +248,7 @@ Left as they are:
 
 ## 13. Actions for 3.5 (Codex)
 
-1. **Urgent, unchanged:** the MTN duplicate-order privacy fix. Instant Bundle and Airtime `ACTIVE_MTN_ORDER` 409s return another customer's `existingOrderReference` (`server/routes/api.ts`, around lines 562 and 737). This closeout documents it only.
+1. **MTN duplicate-order privacy fix: landed on `main` during this closeout** (PR #159, "protect MTN conflict tracking details", `9835137`). The `ACTIVE_MTN_ORDER` 409s now return the existing order's reference and status only to its signed-in owner (`activeMtnOrderConflict` in `server/services/duplicateOrderProtection.ts`). This closeout was merged on top of it and doesn't change it. Still to confirm: that it is deployed, and a live check that a guest or another account no longer receives someone else's reference.
 2. **Mystery Gifts:** the separate Gift Recipients audience (handoff section 6.6.1), with the recipient-safe notifications and the rest of section 6, before any gift is sold.
 3. **No correction needed** for the Welcome Offer: production serves it enabled at GH₵1.
 4. **Founder decisions** (not 3.5 code):
